@@ -1,0 +1,102 @@
+open HolKernel pred_setSyntax listTheory rich_listTheory
+open  pred_setTheory
+open pred_setTheory
+val _ = new_theory "poregex"
+val regex = Datatype `Reg = Eps
+                          | Sym 'a
+                          | Alt Reg Reg
+                          | Seq Reg Reg
+                          | Rep Reg`;
+
+val LANGUAGE_OF_def = Define 
+  `(language_of Eps = {[]}) /\
+   (language_of (Sym c) = {[c]}) /\
+   (language_of (Alt a b) = (language_of a) UNION (language_of b) ) /\
+   (language_of (Seq f s) = 
+     {fstPrt ++ sndPrt | (fstPrt IN language_of f) /\ 
+                         (sndPrt IN language_of s) } ) /\
+   (language_of (Rep r) = 
+     {x| ?words. (words <> []) /\ 
+                 (EVERY (\e. e IN language_of r) words) /\
+                 ((FLAT words)=x)})`;
+
+EVAL ``[1;3] IN (language_of (Seq (Alt (Sym 1) (Sym 2)) (Sym 3)))``;
+EVAL ``language_of (Rep (Alt (Sym 1) (Sym 2)))``;
+
+val SanityRep = prove(
+  ``[1;2;1;1] IN language_of (Rep (Alt (Sym 1) (Sym 2)))``,
+  Ho_Rewrite.REWRITE_TAC [LANGUAGE_OF_def,IN_GSPEC_IFF]>>
+  Q.EXISTS_TAC `[[1];[2];[1];[1]]` >>
+  SIMP_TAC list_ss []
+);
+
+
+val ANDL_def = Define `ANDL l = FOLDL $/\ T l`
+val ORL_def = Define `ORL l = FOLDL $\/ F l`
+val AND_FOLD_FALSE_thm = prove(
+  ``!a. ~(FOLDL $/\ F a)``,
+  Induct >> ASM_SIMP_TAC std_ss [FOLDL]
+);
+
+val SanityRepNotNullable = prove(
+  ``~([] IN language_of (Rep (Alt (Sym 1) (Sym 2))))``,
+
+  Ho_Rewrite.REWRITE_TAC [LANGUAGE_OF_def,IN_GSPEC_IFF, NOT_EXISTS_THM]>>
+  Induct >> ASM_SIMP_TAC list_ss [AND_FOLD_FALSE_thm]
+);
+
+val SanityRepNullable = prove(
+  ``([] IN language_of (Rep (Alt (Eps) (Sym 2))))``,
+
+  Ho_Rewrite.REWRITE_TAC [LANGUAGE_OF_def,IN_GSPEC_IFF]>>
+  Q.EXISTS_TAC `[[]]` >>
+  SIMP_TAC list_ss []
+);
+
+
+val SPLIT_def = Define 
+  `(split []    = [([],[])]) /\
+   (split (c::cs) = ([],c::cs)::(MAP (\x. (c::(FST x), SND x)) (split cs)))`;
+
+EVAL ``split []``;
+EVAL ``split [x]``;
+EVAL ``split [x;y;z]``;
+
+val PARTS_def = Define
+  `(parts []  : ((('a list) list) list)    = [[]])  /\
+   (parts [c] : ((('a list) list) list)    = [[[c]]]) /\
+   (parts (c::cs) : ((('a list) list) list) = 
+       FLAT (MAP (\x. [[c]::x; (c::(HD x))::(TL x)]) (parts cs)))`;
+
+EVAL ``parts [x;y;z]``;
+EVAL ``parts []``;
+EVAL ``parts [x;y;z;w]``:
+
+val ACCEPT_def = Define 
+  `(accept Eps       u = (u=[]))/\
+   (accept (Sym c)   u = (u=[c]))/\
+   (accept (Alt p q) u = (accept p u \/ accept q u))/\
+   (accept (Seq p q) u = 
+     (EXISTS
+       (\x. accept p (FST x) /\ accept q (SND x)) 
+       (split u)
+     )
+   )/\
+   (accept (Rep r)   u = 
+      EXISTS (\partition. EVERY (\part. accept r part) partition) (parts u)
+   )`;
+
+
+EVAL ``accept (Sym e) [e]``;
+
+EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1;3]``
+
+EVAL ``accept (Rep (Sym 1)) []``;
+REWRITE_TAC [ACCEPT_def, PARTS_def]
+REWRITE_TAC [EXISTS_DEF]
+SIMP_TAC std_ss []
+EVERY_DEF
+
+EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;1]``;
+
+EVAL ``FOLDR $\/  F [F;F]``
