@@ -1,13 +1,22 @@
 open HolKernel Parse boolLib bossLib
 open pred_setSyntax listTheory rich_listTheory pred_setTheory
+open EmitML basis_emitTheory
 		    
 val _ = new_theory "poregex"
+
+(* =========================== *)
+(*    DEFINITION OF REGEX    *)
+(* =========================== *)
 
 val Regex = Datatype `Reg = Eps
                           | Sym 'a
                           | Alt Reg Reg
                           | Seq Reg Reg
                           | Rep Reg`;
+
+(* =========================== *)
+(*    REGEX Semantix         *)
+(* =========================== *)
 
 val LANGUAGE_OF_def = Define 
   `(language_of Eps = {[]}) /\
@@ -51,6 +60,9 @@ val SanityRepNullable = prove(
   SIMP_TAC list_ss []
 );
 
+(* =========================== *)
+(* Executable model of regex *)
+(* =========================== *)
 
 val SPLIT_def = Define 
   `(split []    = [([],[])]) /\
@@ -96,6 +108,14 @@ EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1;3]``;
 EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1]``;
 EVAL ``accept (Rep (Alt (Sym 1) (Eps))) []``;
 EVAL ``accept (Rep (Sym 1)) []``;
+
+
+
+
+
+(* ============================================================ *)
+(*  Equaivalance of semantics and executable model         *)
+(* ============================================================= *)
 
 (*REWRITE_TAC [ACCEPT_def, PARTS_def]
 REWRITE_TAC [EXISTS_DEF]
@@ -171,5 +191,23 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
     ASM_SIMP_TAC list_ss []
     REPLICATE 
     SIMP_TAC std_ss []
-  *)  
-val _ = export_theory()
+  *)
+
+ (* ======================================= *)
+(*            Code generation            *)
+ (* ======================================= *)
+
+
+emitML (!Globals.emitMLDir) ("poregex", [
+                         MLSIG "Type 'a list = 'a listML.list",
+                         OPEN ["list"],
+                         DATATYPE `Reg = Eps
+                                       | Sym 'a
+                                       | Alt Reg Reg
+                                       | Seq Reg Reg
+                                       | Rep Reg`,
+                         DEFN SPLIT_def,
+                         DEFN PARTS_def,
+                         DEFN ACCEPT_def 
+                           ]);
+val _ = export_theory();

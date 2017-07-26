@@ -9,18 +9,15 @@ struct
   fun V s q = mk_var(s,q)
   val U     = mk_vartype
   (* Parents and ML dependencies *)
-  local open indexedListsTheory patternMatchesTheory
+  local open basis_emitTheory
   in end;
   val _ = Theory.link_parents
           ("poregex",
-          Arbnum.fromString "1501061068",
-          Arbnum.fromString "922018")
-          [("indexedLists",
-           Arbnum.fromString "1492712812",
-           Arbnum.fromString "523551"),
-           ("patternMatches",
-           Arbnum.fromString "1492712832",
-           Arbnum.fromString "748185")];
+          Arbnum.fromString "1501080610",
+          Arbnum.fromString "308827")
+          [("basis_emit",
+           Arbnum.fromString "1492712999",
+           Arbnum.fromString "229888")];
   val _ = Theory.incorporate_types "poregex" [("Reg", 1)];
 
   val idvector = 
@@ -284,7 +281,7 @@ struct
   local open GrammarSpecials Parse
     fun UTOFF f = Feedback.trace("Parse.unicode_trace_off_complaints",0)f
   in
-  val poregex_grammars = merge_grammars ["indexedLists", "patternMatches"]
+  val poregex_grammars = merge_grammars ["basis_emit"]
   local
   val (tyUDs, tmUDs) = GrammarDeltas.thy_deltas{thyname="poregex"}
   val addtmUDs = term_grammar.add_deltas tmUDs
@@ -328,6 +325,52 @@ in
         tyinfo0
       end
     ];
+
+
+  val _ = 
+     let open Parse
+         fun doit (r,(b,s,ty)) = 
+           let val c = Term.mk_thy_const r
+           in ConstMapML.prim_insert(c,(b,"poregex",s,ty))
+           end
+         fun typ s = Feedback.trace ("Vartype Format Complaint", 0)
+                      (#1 (parse_from_grammars min_grammars))
+                      [QUOTE (":"^s)]
+     in
+       List.app doit [
+         ({Name = "Eps", Thy = "poregex", Ty = typ "'a poregex$Reg"},
+          (true, "Eps", typ "'a poregex$Reg")),
+         ({Name = "Sym", Thy = "poregex", Ty = typ "'a -> 'a poregex$Reg"},
+          (true, "Sym", typ "'a -> 'a poregex$Reg")),
+         ({Name = "Alt", Thy = "poregex",
+           Ty = typ "'a poregex$Reg -> 'a poregex$Reg -> 'a poregex$Reg"},
+          (true, "Alt",
+           typ "'a poregex$Reg -> 'a poregex$Reg -> 'a poregex$Reg")),
+         ({Name = "Seq", Thy = "poregex",
+           Ty = typ "'a poregex$Reg -> 'a poregex$Reg -> 'a poregex$Reg"},
+          (true, "Seq",
+           typ "'a poregex$Reg -> 'a poregex$Reg -> 'a poregex$Reg")),
+         ({Name = "Rep", Thy = "poregex",
+           Ty = typ "'a poregex$Reg -> 'a poregex$Reg"},
+          (true, "Rep", typ "'a poregex$Reg -> 'a poregex$Reg")),
+         ({Name = "split", Thy = "poregex",
+           Ty =
+             typ
+             "'a list$list -> ('a list$list, 'a list$list) pair$prod list$list"},
+          (false, "split",
+           typ
+           "'a list$list -> ('a list$list, 'a list$list) pair$prod list$list")),
+         ({Name = "parts", Thy = "poregex",
+           Ty = typ "''a list$list -> ''a list$list list$list list$list"},
+          (false, "parts",
+           typ "''a list$list -> ''a list$list list$list list$list")),
+         ({Name = "accept", Thy = "poregex",
+           Ty = typ "''a poregex$Reg -> ''a list$list -> bool"},
+          (false, "accept",
+           typ "''a poregex$Reg -> ''a list$list -> bool"))
+       ]
+     end
+
 
 val _ = if !Globals.print_thy_loads then TextIO.print "done\n" else ()
 val _ = Theory.load_complete "poregex"
