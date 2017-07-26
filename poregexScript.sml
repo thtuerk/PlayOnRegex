@@ -1,7 +1,7 @@
 open HolKernel Parse boolLib bossLib
 open pred_setSyntax listTheory rich_listTheory pred_setTheory
 open EmitML basis_emitTheory
-		    
+                    
 val _ = new_theory "poregex"
 
 (* =========================== *)
