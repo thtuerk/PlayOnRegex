@@ -1,6 +1,9 @@
-open HolKernel pred_setSyntax listTheory rich_listTheory pred_setTheory
+open HolKernel Parse boolLib bossLib
+open pred_setSyntax listTheory rich_listTheory pred_setTheory
+		    
 val _ = new_theory "poregex"
-val regex = Datatype `Reg = Eps
+
+val Regex = Datatype `Reg = Eps
                           | Sym 'a
                           | Alt Reg Reg
                           | Seq Reg Reg
@@ -66,13 +69,11 @@ val PARTS_def = Define
    `;
 
 
-``
-
 EVAL ``parts [x;y;z]``;
 EVAL ``parts [1;2]``;
 EVAL ``parts [1]``;
 EVAL ``parts []``;
-EVAL ``parts [x;y;z;w]``:
+EVAL ``parts [x;y;z;w]``;
 
 val ACCEPT_def = Define 
   `(accept Eps       u = (u=[]))/\
@@ -91,27 +92,29 @@ val ACCEPT_def = Define
 
 EVAL ``accept (Sym e) [e]``;
 EVAL ``accept (Sym e) []``;
-EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1;3]``
-EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1]``
-EVAL ``accept (Rep (Alt (Sym 1) (Eps))) []``
+EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1;3]``;
+EVAL ``accept (Rep (Alt (Sym 1) (Sym 2))) [1;2;1;1]``;
+EVAL ``accept (Rep (Alt (Sym 1) (Eps))) []``;
 EVAL ``accept (Rep (Sym 1)) []``;
 
-REWRITE_TAC [ACCEPT_def, PARTS_def]
+(*REWRITE_TAC [ACCEPT_def, PARTS_def]
 REWRITE_TAC [EXISTS_DEF]
 SIMP_TAC std_ss []
 EVERY_DEF
-
+*)
 EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;1]``;
 
-prove( 
-``!R x. x IN language_of R ==> accept R x``,
-Induct_on `R` >> 
-   SIMP_TAC list_ss [LANGUAGE_OF_def, ACCEPT_def] >|
-[
-  REPEAT STRIP_TAC >> 
-  FULL_SIMP_TAC bool_ss []
-,
-  cheat
+val LANGUAGE_ACCEPTED_THM = store_thm(
+  "LANGUAGE_ACCEPTED_THM", 
+  ``!R x. x IN language_of R ==> accept R x``,
+  
+  Induct_on `R` >> 
+    SIMP_TAC list_ss [LANGUAGE_OF_def, ACCEPT_def] >|
+  [
+    REPEAT STRIP_TAC >> 
+    FULL_SIMP_TAC bool_ss []
+  ,
+    cheat
   (* do not know how to deal with append in comprehension *)
   (* if only sohehow i could rewrite 
             x ∈ {fstPrt ++ sndPrt |
@@ -121,31 +124,31 @@ Induct_on `R` >>
             fstPrt ∈ language_of R   ∧
             sndPrt ∈ language_of R'} 
   *)
-,
-  GEN_TAC>>
-  FULL_SIMP_TAC bool_ss [IN_GSPEC_IFF]>>
-  REPEAT STRIP_TAC >> 
-  Cases_on `x` >> ASM_REWRITE_TAC [ACCEPT_def] >- (
-    Cases_on `words=[]::t`>|
-    [ 
-      FULL_SIMP_TAC list_ss [FLAT,EVERY_DEF]
-    ,
-      Cases_on `words` >> FULL_SIMP_TAC list_ss []
-    ];
-  )>>
-  Induct_on `words`>>
-  METIS_TAC [FLAT]
-  REPEAT STRIP_TAC >> 
-  GEN_TAC
-  REWRITE_TAC [PARTS_def]
-  STRIP_TAC
-  `words <> []` by ASM_SIMP_TAC list_ss []
-  (* to be continued *)
-
-];
+  ,
+   cheat
+    (*GEN_TAC>>
+    FULL_SIMP_TAC bool_ss [IN_GSPEC_IFF]>>
+    REPEAT STRIP_TAC >> 
+    Cases_on `x` >> ASM_REWRITE_TAC [ACCEPT_def] >- (
+      Cases_on `words=[]::t`>|
+      [ 
+        FULL_SIMP_TAC list_ss [FLAT,EVERY_DEF]
+      ,
+        Cases_on `words` >> FULL_SIMP_TAC list_ss []
+      ];
+    )>>
+    Induct_on `words`>>
+    METIS_TAC [FLAT]
+    REPEAT STRIP_TAC >> 
+    GEN_TAC
+    REWRITE_TAC [PARTS_def]
+    STRIP_TAC
+    `words <> []` by ASM_SIMP_TAC list_ss []*)
+    (* to be continued *)
+  ]
 );
 
-
+(*
 ``!x n e. accept (Rep (Sym e)) (REPLICATE (n+1) e)``
   `!n. (n + 1 ) = ( SUC n )` by DECIDE_TAC >> 
   Q.PAT_X_ASSUM `_` (fn x => REWRITE_TAC [x, REPLICATE ])
@@ -168,3 +171,5 @@ Induct_on `R` >>
     ASM_SIMP_TAC list_ss []
     REPLICATE 
     SIMP_TAC std_ss []
+  *)  
+val _ = export_theory()
