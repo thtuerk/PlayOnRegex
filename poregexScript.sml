@@ -1,5 +1,5 @@
 open HolKernel Parse boolLib bossLib
-open pred_setSyntax listTheory rich_listTheory pred_setTheory
+open pred_setSyntax pred_setLib listTheory rich_listTheory pred_setTheory
 open EmitML basis_emitTheory
                     
 val _ = new_theory "poregex"
@@ -33,10 +33,22 @@ val LANGUAGE_OF_def = Define
 EVAL ``[1;3] IN (language_of (Seq (Alt (Sym 1) (Sym 2)) (Sym 3)))``;
 EVAL ``language_of (Rep (Alt (Sym 1) (Sym 2)))``;
 
+
 val SanityRep = prove(
   ``[1;2;1;1] IN language_of (Rep (Alt (Sym 1) (Sym 2)))``,
   Ho_Rewrite.REWRITE_TAC [LANGUAGE_OF_def,IN_GSPEC_IFF]>>
   Q.EXISTS_TAC `[[1];[2];[1];[1]]` >>
+  SIMP_TAC list_ss []
+);
+
+val SanitySeq1 = prove( 
+  `` [1;2] IN language_of (Seq (Sym 1)(Sym 2))``,
+  Ho_Rewrite.REWRITE_TAC [LANGUAGE_OF_def,IN_GSPEC_IFF]>>
+  REWRITE_TAC [ SET_SPEC_CONV 
+    ``[1; 2] IN {fstPrt ++ sndPrt | fstPrt IN {[1]} /\ sndPrt IN {[2]}}`` 
+  ]>>
+  Q.EXISTS_TAC `[1]` >>
+  Q.EXISTS_TAC `[2]` >>
   SIMP_TAC list_ss []
 );
 
@@ -68,10 +80,40 @@ val SPLIT_def = Define
   `(split []    = [([],[])]) /\
    (split (c::cs) = ([],c::cs)::(MAP (\x. (c::(FST x), SND x)) (split cs)))`;
 
+
+val SPLIT_APPEND_THM = store_thm( 
+  "SPLIT_APPEND_THM",
+  ``!A B. ? C D. (split (A++B)) = ( C++[(A,B)] ++ D)``
+,
+ Induct >-
+ (
+   GEN_TAC >> Q.EXISTS_TAC `[]`>>
+   Cases_on `B` >| 
+   [
+     Q.EXISTS_TAC `[]`
+   ,
+     Q.EXISTS_TAC `(MAP (\x. (h::(FST x), SND x)) (split t))`
+   ]>>
+   SIMP_TAC list_ss [ SPLIT_def]
+ )>>
+ REPEAT GEN_TAC>>
+ SIMP_TAC list_ss [ SPLIT_def] >>
+ Q.PAT_X_ASSUM `!B._` (fn x=> (MP_TAC (Q.SPEC `B` x)))>>
+ STRIP_TAC>>
+ Q.PAT_X_ASSUM `_` (fn x=> (REWRITE_TAC [x]))>>
+ SIMP_TAC list_ss [MAP_APPEND]>>
+ Q.EXISTS_TAC `([],h::(A ++ B))::(MAP (λx. (h::FST x,SND x)) C)`>>
+ Q.EXISTS_TAC `(MAP (\x. (h::FST x,SND x)) D)`>>
+ SIMP_TAC list_ss []
+);
+ 
 EVAL ``split []``;
 EVAL ``split [x]``;
 EVAL ``split [x;y;z]``;
 
+
+(* It was pritty hard to work with this definition, 
+   maybe i should redefine this  *)
 val PARTS_def = Define
   `(parts []     = [[]]) /\
    (parts (c::cs) = 
@@ -86,6 +128,28 @@ EVAL ``parts [1;2]``;
 EVAL ``parts [1]``;
 EVAL ``parts []``;
 EVAL ``parts [x;y;z;w]``;
+
+val PARTS_FLAT_MEM_THM = store_thm(
+  "PARTS_FLAT_MEM_THM",
+  ``!partition l. ((FLAT partition) = l) ==> (MEM (FILTER ($<>[]) partition) ( parts l))``,
+  Induct>-
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+    
+  REPEAT GEN_TAC>>
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+  Cases_on `h`>>ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+  STRIP_TAC>>
+  
+  `?r.((FLAT partition')=r) /\( l = h'::(t++r))` by ASM_SIMP_TAC list_ss []>>
+  Q.PAT_X_ASSUM `!l. _` (fn x=> MP_TAC (Q.SPEC `r` x))>>
+  ASM_REWRITE_TAC []>>
+  Q.PAT_X_ASSUM `FLAT _ = _` (fn x=> REWRITE_TAC [GSYM x])>>
+  REWRITE_TAC[PARTS_def]>>
+  IF_CASES_TAC>>
+    ASM_SIMP_TAC list_ss [MAP, PARTS_def, FLAT, MEM, FILTER]>>
+  (* TODO: finish proof *)
+  cheat
+); 
 
 val ACCEPT_def = Define 
   `(accept Eps       u = (u=[]))/\
@@ -117,54 +181,48 @@ EVAL ``accept (Rep (Sym 1)) []``;
 (*  Equaivalance of semantics and executable model         *)
 (* ============================================================= *)
 
-(*REWRITE_TAC [ACCEPT_def, PARTS_def]
-REWRITE_TAC [EXISTS_DEF]
-SIMP_TAC std_ss []
-EVERY_DEF
-*)
-EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;1]``;
+EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;2]``;
+
+
 
 val LANGUAGE_ACCEPTED_THM = store_thm(
   "LANGUAGE_ACCEPTED_THM", 
   ``!R x. x IN language_of R ==> accept R x``,
   
   Induct_on `R` >> 
-    SIMP_TAC list_ss [LANGUAGE_OF_def, ACCEPT_def] >|
+    (* Solve simple cases *)
+    REPEAT STRIP_TAC >> 
+    FULL_SIMP_TAC list_ss [LANGUAGE_OF_def, ACCEPT_def] >|
   [
-    REPEAT STRIP_TAC >> 
-    FULL_SIMP_TAC bool_ss []
-  ,
-    cheat
-  (* do not know how to deal with append in comprehension *)
-  (* if only sohehow i could rewrite 
-            x ∈ {fstPrt ++ sndPrt |
-                 fstPrt ∈ language_of R ∧ sndPrt ∈ language_of R'} 
-   to
-            (x = firstPrt ++ sndPrt) ∧
-            fstPrt ∈ language_of R   ∧
-            sndPrt ∈ language_of R'} 
-  *)
-  ,
-   cheat
-    (*GEN_TAC>>
+    FULL_SIMP_TAC std_ss [SET_SPEC_CONV ``x IN
+      {fstPrt ++ sndPrt |
+       fstPrt IN language_of R /\ sndPrt IN language_of R'}``]>>
+    MP_TAC (Q.SPECL [`fstPrt`,`sndPrt`] SPLIT_APPEND_THM)>>
+    STRIP_TAC>>
+    ASM_SIMP_TAC std_ss [EXISTS_DEF, EXISTS_APPEND]
+  ,                  
     FULL_SIMP_TAC bool_ss [IN_GSPEC_IFF]>>
-    REPEAT STRIP_TAC >> 
-    Cases_on `x` >> ASM_REWRITE_TAC [ACCEPT_def] >- (
-      Cases_on `words=[]::t`>|
-      [ 
-        FULL_SIMP_TAC list_ss [FLAT,EVERY_DEF]
-      ,
-        Cases_on `words` >> FULL_SIMP_TAC list_ss []
-      ];
+    Cases_on `x` >> ASM_REWRITE_TAC [ACCEPT_def] >- 
+    (
+      Cases_on `words=[]::t`>>
+      Cases_on `words`>>
+      FULL_SIMP_TAC list_ss [FLAT,EVERY_DEF]
     )>>
-    Induct_on `words`>>
-    METIS_TAC [FLAT]
-    REPEAT STRIP_TAC >> 
-    GEN_TAC
-    REWRITE_TAC [PARTS_def]
-    STRIP_TAC
-    `words <> []` by ASM_SIMP_TAC list_ss []*)
-    (* to be continued *)
+    REWRITE_TAC [ EXISTS_MEM]>>
+    Q.EXISTS_TAC `FILTER ($<>[]) words`>>
+    STRIP_TAC >|
+    [ 
+      ASM_SIMP_TAC list_ss [PARTS_FLAT_MEM_THM]
+    ,
+      SIMP_TAC std_ss []
+      LANGUAGE_OF_def 
+      Q.SPECL [`\e.true`, `\(x:'a list).x=x`, `(words:'a list list)`] EVERY_FILTER_IMP 
+      REWRITE_TAC [EVERY_FILTER_IMP]
+      Q.PAT_X_ASSUM `EVERY (_) words` (fn x => MP_TAC x)>>
+      SIMP_TAC std_ss [EVERY_MEM]>>
+      REPEAT STRIP_TAC>>
+      ASM_SIMP_TAC std_ss[]
+    ]
   ]
 );
 
