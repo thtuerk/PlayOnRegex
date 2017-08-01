@@ -135,8 +135,56 @@ EVAL ``parts [1]``;
 EVAL ``parts []``;
 EVAL ``parts [x;y;z;w]``;
 
+val PARTS_EMPTY_THM = store_thm(
+  "PARTS_EMPTY_THM",
+  ``!e. (e =[]) = (MEM (e) (parts ([])))``,
+
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
+);
+
+val PARTS_NON_EMPTY_THM = store_thm(
+  "PARTS_NON_EMPTY_THM",
+  ``!e x . x<>[] ==> 
+           (MEM x (parts e )) ==> 
+           (e<>[])``,
+     ASM_SIMP_TAC list_ss [PARTS_EMPTY_THM]    
+);
+
+val PARTS_EMPTY_THM2 = store_thm(
+  "PARTS_EMPTY_THM2",
+  ``!e. (MEM [] (parts e )) ==> (e=[])``,
+
+    Induct_on `e` >- 
+      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+    
+    SIMP_TAC list_ss []>>
+    GEN_TAC>>
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+    IF_CASES_TAC >-
+      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+    
+    ASM_SIMP_TAC list_ss [MEM_FLAT]>>
+    GEN_TAC>>
+    Cases_on `MEM l (MAP (λx. [[h]::x; (h::HD x)::TL x]) (parts e))` >|
+    [
+      DISJ2_TAC>>
+      FULL_SIMP_TAC list_ss [MEM_MAP]
+    ,
+      DISJ1_TAC>>
+      ASM_REWRITE_TAC[]
+    ]
+);
+
+val PARTS_SINGEL_THM = store_thm(
+  "PARTS_SINGEl_THM",
+  ``!e x. (e =[[x]]) = (MEM (e) (parts [x]))``,
+
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
+
+);
+
 val PARTS_MEM_HEAD_THM = store_thm(
-  "PARTS_MEM_APPEND_THM",
+  "PARTS_MEM_HEAD_THM",
   ``!h t e. (MEM e (parts t)) =
             (MEM ([h]::e) (parts (h::t)))``,
   REPEAT STRIP_TAC>>
@@ -174,11 +222,158 @@ val PARTS_MEM_HEAD_THM = store_thm(
   ]
 );
 
+val PARTS_MEM_APPEND_THM1 = store_thm(
+  "PARTS_MEM_APPEND_THM1",
+
+  ``!l1 l2 l1' l2'. (MEM l1' (parts l1))  ==>
+            (MEM l2' (parts l2))  ==>
+            (MEM (l1' ++ l2') (parts (l1 ++ l2)))``,
+  
+  Induct_on `l1` >- 
+      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+
+  
+  REPEAT GEN_TAC>>  
+    
+  Cases_on `l1'`>-
+  ( 
+    STRIP_TAC>>
+    MP_TAC ( Q.SPEC `h::l1` PARTS_EMPTY_THM2)>>
+    ASM_SIMP_TAC list_ss [] )>>
+  
+  Cases_on `h'=[h]`>>
+  ASM_SIMP_TAC list_ss []>>
+  ASM_REWRITE_TAC [GSYM PARTS_MEM_HEAD_THM]>>
+  
+
+  ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]>>
+  IF_CASES_TAC >>
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]>>
+  REPEAT STRIP_TAC
+  
+    Q.EXISTS_TAC `L`>>
+    `(∃x. (L = [[h]::x; (h::HD x)::TL x]) ∧ MEM x (parts (l1 ++ l2)))` by ALL_TAC
+    Q.EXISTS_TAC `(l1'++l2')`
+    REV_FULL_SIMP_TAC bool_ss [] >>
+    FULL_SIMP_TAC bool_ss [] >>
+  REWRITE_TAC [ Q.SPECL [``, ``,``]( GSYM PARTS_MEM_HEAD_THM ) ]
+
+  REWRITE_TAC [GSYM PARTS_EMPTY_THM] 
+  STRIP_TAC
+  SIMP_TAC list_ss [PARTS_EMPTY_THM]
+  REWRITE_TAC [LAND_CONV
+  (REWRITE_CONV
+[PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP, PARTS_EMPTY_THM, PARTS_SINGEL_THM])
+
+
+``MEM l1' (parts (h::l1)) ⇒
+MEM l2' (parts l2) ⇒
+MEM (l1' ++ l2') (parts (h::l1 ++ l2))`` ]
+
+
+IF_CASES_TAC >>
+    ASM_SIMP_TAC list_ss [ FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]
+REPEAT STRIP_TAC
+MP_TAC (Q.SPECL [ `h`, `l2`, `l2'`] PARTS_MEM_HEAD_THM)
+ASM_REWRITE_TAC []
+
+
+
+REPEAT STRIP_TAC
+
+      
+   ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP, PARTS_EMPTY_THM, PARTS_SINGEL_THM]>>
+   
+   REPEAT (
+     IF_CASES_TAC >>
+       ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]
+   )>>
+   ASM_SIMP_TAC list_ss [ PARTS_EMPTY_THM, PARTS_SINGEL_THM]>>
+   REPEAT STRIP_TAC>>
+   (* include decomposition stuff *)
+   
+    FULL_SIMP_TAC bool_ss [PARTS_EMPTY_THM, PARTS_SINGEL_THM ] >>
+
+    Q.EXISTS_TAC `parts (h::l2)`>>
+    STRIP_TAC>-
+    (
+      
+      Q.EXISTS_TAC `l2'`>> 
+      ASM_SIMP_TAC std_ss []>>
+  
+
+(* clean try *)
+
+  Induct_on `l1` >- 
+      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+      
+  REPEAT GEN_TAC>>  
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+    REPEAT (IF_CASES_TAC >>
+      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP] )>>
+    REPEAT STRIP_TAC >>
+    [
+
+      Q.EXISTS_TAC `[[h]::l2'; (h::HD l2')::TL l2']`>>
+      ASM_SIMP_TAC list_ss [ GSYM PARTS_MEM_HEAD_THM]
+     ,
+    
+      Q.EXISTS_TAC `[[h]::(x++l2'); (h::HD (x++l2'))::TL (x++l2')]`>>
+      STRIP_TAC
+      Q.EXISTS_TAC `(x++l2')`>>
+      ASM_SIMP_TAC list_ss []
+     
+
+ 
+      ASM_SIMP_TAC list_ss [ GSYM PARTS_MEM_HEAD_THM]
+      REV_FULL_SIMP_TAC list_ss [MEM]
+      REWRITE_TAC [MEM]
+      ASM_SIMP_TAC list_ss []
+      DISJ2_TAC 
+      
+
+      ASM_SIMP_TAC list_ss []
+      TL
+
+      EVAL ``TL ([[]])``
+      DB.find
+
+      STRIP_TAC
+
+    FULL_SIMP_TAC bool_ss [] >>
+    Q.EXISTS_TAC `l'`>>
+    STRIP_TAC>-
+      (Q.EXISTS_TAC `x'`>> ASM_SIMP_TAC std_ss [])>>
+    Q.PAT_X_ASSUM `MEM ([h']::e) _` (fn x => MP_TAC x)>>
+)
+
+val PARTS_MEM_APPEND_THM2 = store_thm(
+  "PARTS_MEM_APPEND_THM2",
+
+  ``!l1 l2 l1' l2'. (MEM l1' (parts l1))  ==>
+            (MEM l2' (parts l2))  ==>
+            (MEM (l1' ++ l2') (parts (l1 ++ l2)))``,
+
+)
+
+
 val PARTS_FLAT_MEM_THM = store_thm(
   "PARTS_FLAT_MEM_THM",
-  ``!partition l. ((FILTER ($<>[]) partition) = partition) ==>
-                  ((FLAT partition) = l) ==> 
-                  ((MEM partition) ( parts l))``,
+  
+  ``!partition l. ((FLAT partition) = l) ==> 
+                  ((MEM (FILTER ($<>[] ) partition)) ( parts l))``,
+  Induct_on `l`>-
+  (
+    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+    GEN_TAC>>
+    SIMP_TAC list_ss [FILTER_EQ_NIL, FLAT_EQ_NIL]>>
+    cheat )
+  
+  REPEAT GEN_TAC
+  SIMP_TAC list_ss [PARTS_MEM_HEAD_THM]
+  cheat
+);
+  (*
   Induct>|
   [
     REPEAT STRIP_TAC>>
@@ -202,7 +397,7 @@ val PARTS_FLAT_MEM_THM = store_thm(
      Q.EXISTS_TAC `[l]`
        FULL_SIMP_TAC list_ss []>>
     
-
+*)
 
 
 
