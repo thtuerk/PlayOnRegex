@@ -1,5 +1,5 @@
 open HolKernel Parse boolLib bossLib
-open pred_setSyntax pred_setLib listTheory rich_listTheory pred_setTheory
+open pred_setSyntax pred_setLib listTheory rich_listTheory listTheory pred_setTheory
 open EmitML basis_emitTheory
                     
 val _ = new_theory "poregex"
@@ -122,6 +122,42 @@ val PARTS_def = Define
      else FLAT (MAP (\x. [[c]::x; (c::(HD x))::(TL x)]) (parts cs)))
    `;
 
+
+val PARTS_SPEC = store_thm ("parts_SPEC",
+  ``!(l:'a list) ll. MEM ll (parts l) <=> (~(MEM [] ll) /\ (FLAT ll = l))``,
+
+Induct >- (
+  SIMP_TAC list_ss [PARTS_def, FLAT_EQ_NIL, EVERY_MEM] >>
+  Cases_on `ll` >| [
+    SIMP_TAC list_ss [],
+
+    SIMP_TAC list_ss [] >> METIS_TAC[]
+  ]
+) >>
+CONV_TAC (RENAME_VARS_CONV ["c"]) >>
+REPEAT GEN_TAC >>
+ASM_SIMP_TAC (list_ss++boolSimps.LIFT_COND_ss) [PARTS_def,
+  MEM_FLAT, MEM_MAP, PULL_EXISTS] >>
+Cases_on `ll` >> SIMP_TAC list_ss [] >>
+rename1 `cl ++ FLAT ll' = [c:'a]` >>
+Cases_on `cl` >> SIMP_TAC list_ss [] >>
+SIMP_TAC (std_ss++boolSimps.EQUIV_EXTRACT_ss) [] >>
+rename1 `(cl' = ([]:'a list)) /\ (c' = (c:'a))` >>
+Cases_on `l` >> SIMP_TAC list_ss [] >> REPEAT STRIP_TAC >> (
+  REPEAT BasicProvers.VAR_EQ_TAC >> FULL_SIMP_TAC list_ss [PARTS_def]
+) >>
+rename1 `FLAT _ = (c2:'a)::cs` >>
+EQ_TAC >> STRIP_TAC >> REPEAT BasicProvers.VAR_EQ_TAC >| [
+  ASM_SIMP_TAC list_ss [],
+
+  rename1 `FLAT ll' = (_:'a)::_` >>
+  Cases_on `ll'` >> FULL_SIMP_TAC list_ss [],
+
+  Q.EXISTS_TAC `if ((cl':'a list) = []) then ll' else cl'::ll'` >>
+  Cases_on `cl' = []` >> FULL_SIMP_TAC list_ss []
+]);
+
+
 val PARTS2_def = Define
   `(parts' []     = [[]]) /\
    (parts' l = 
@@ -153,27 +189,8 @@ val PARTS_NON_EMPTY_THM = store_thm(
 val PARTS_EMPTY_THM2 = store_thm(
   "PARTS_EMPTY_THM2",
   ``!e. (MEM [] (parts e )) ==> (e=[])``,
+SIMP_TAC list_ss [PARTS_SPEC])
 
-    Induct_on `e` >- 
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    
-    SIMP_TAC list_ss []>>
-    GEN_TAC>>
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    IF_CASES_TAC >-
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    
-    ASM_SIMP_TAC list_ss [MEM_FLAT]>>
-    GEN_TAC>>
-    Cases_on `MEM l (MAP (λx. [[h]::x; (h::HD x)::TL x]) (parts e))` >|
-    [
-      DISJ2_TAC>>
-      FULL_SIMP_TAC list_ss [MEM_MAP]
-    ,
-      DISJ1_TAC>>
-      ASM_REWRITE_TAC[]
-    ]
-);
 
 val PARTS_SINGEL_THM = store_thm(
   "PARTS_SINGEl_THM",
@@ -187,40 +204,8 @@ val PARTS_MEM_HEAD_THM = store_thm(
   "PARTS_MEM_HEAD_THM",
   ``!h t e. (MEM e (parts t)) =
             (MEM ([h]::e) (parts (h::t)))``,
-  REPEAT STRIP_TAC>>
-  EQ_TAC >|
+  SIMP_TAC list_ss [PARTS_SPEC]);
 
-  [
-
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    IF_CASES_TAC >>
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    REWRITE_TAC[ MEM_FLAT, MEM_MAP]>>
-    STRIP_TAC>>
-    SIMP_TAC std_ss []>>
-    Q.EXISTS_TAC `[[h]::e; (h::HD e)::TL e]` >>
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
-  
-  ,
-    Q.SPEC_TAC (`h`, `h`)>>
-    Q.SPEC_TAC (`e`, `e`)>>
-    Induct_on `t`  >-
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-
-    REPEAT GEN_TAC>>  
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    IF_CASES_TAC >>
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]>>
-  
-    STRIP_TAC >>
-    REV_FULL_SIMP_TAC bool_ss [] >>
-    Q.EXISTS_TAC `l'`>>
-    STRIP_TAC>-
-      (Q.EXISTS_TAC `x'`>> ASM_SIMP_TAC std_ss [])>>
-    Q.PAT_X_ASSUM `MEM ([h']::e) _` (fn x => MP_TAC x)>>
-    FULL_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
-  ]
-);
 
 val PARTS_MEM_APPEND_THM1 = store_thm(
   "PARTS_MEM_APPEND_THM1",
@@ -229,123 +214,8 @@ val PARTS_MEM_APPEND_THM1 = store_thm(
             (MEM l2' (parts l2))  ==>
             (MEM (l1' ++ l2') (parts (l1 ++ l2)))``,
   
-  Induct_on `l1` >- 
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
+SIMP_TAC list_ss [PARTS_SPEC]);
 
-  
-  REPEAT GEN_TAC>>  
-    
-  Cases_on `l1'`>-
-  ( 
-    STRIP_TAC>>
-    MP_TAC ( Q.SPEC `h::l1` PARTS_EMPTY_THM2)>>
-    ASM_SIMP_TAC list_ss [] )>>
-  
-  Cases_on `h'=[h]`>>
-  ASM_SIMP_TAC list_ss []>>
-  ASM_REWRITE_TAC [GSYM PARTS_MEM_HEAD_THM]>>
-  
-
-  ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]>>
-  IF_CASES_TAC >>
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]>>
-  REPEAT STRIP_TAC
-  
-    Q.EXISTS_TAC `L`>>
-    `(∃x. (L = [[h]::x; (h::HD x)::TL x]) ∧ MEM x (parts (l1 ++ l2)))` by ALL_TAC
-    Q.EXISTS_TAC `(l1'++l2')`
-    REV_FULL_SIMP_TAC bool_ss [] >>
-    FULL_SIMP_TAC bool_ss [] >>
-  REWRITE_TAC [ Q.SPECL [``, ``,``]( GSYM PARTS_MEM_HEAD_THM ) ]
-
-  REWRITE_TAC [GSYM PARTS_EMPTY_THM] 
-  STRIP_TAC
-  SIMP_TAC list_ss [PARTS_EMPTY_THM]
-  REWRITE_TAC [LAND_CONV
-  (REWRITE_CONV
-[PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP, PARTS_EMPTY_THM, PARTS_SINGEL_THM])
-
-
-``MEM l1' (parts (h::l1)) ⇒
-MEM l2' (parts l2) ⇒
-MEM (l1' ++ l2') (parts (h::l1 ++ l2))`` ]
-
-
-IF_CASES_TAC >>
-    ASM_SIMP_TAC list_ss [ FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]
-REPEAT STRIP_TAC
-MP_TAC (Q.SPECL [ `h`, `l2`, `l2'`] PARTS_MEM_HEAD_THM)
-ASM_REWRITE_TAC []
-
-
-
-REPEAT STRIP_TAC
-
-      
-   ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP, PARTS_EMPTY_THM, PARTS_SINGEL_THM]>>
-   
-   REPEAT (
-     IF_CASES_TAC >>
-       ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP]
-   )>>
-   ASM_SIMP_TAC list_ss [ PARTS_EMPTY_THM, PARTS_SINGEL_THM]>>
-   REPEAT STRIP_TAC>>
-   (* include decomposition stuff *)
-   
-    FULL_SIMP_TAC bool_ss [PARTS_EMPTY_THM, PARTS_SINGEL_THM ] >>
-
-    Q.EXISTS_TAC `parts (h::l2)`>>
-    STRIP_TAC>-
-    (
-      
-      Q.EXISTS_TAC `l2'`>> 
-      ASM_SIMP_TAC std_ss []>>
-  
-
-(* clean try *)
-
-  Induct_on `l1` >- 
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-      
-  REPEAT GEN_TAC>>  
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    REPEAT (IF_CASES_TAC >>
-      ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER, MEM_FLAT, MEM_MAP] )>>
-    REPEAT STRIP_TAC >>
-    [
-
-      Q.EXISTS_TAC `[[h]::l2'; (h::HD l2')::TL l2']`>>
-      ASM_SIMP_TAC list_ss [ GSYM PARTS_MEM_HEAD_THM]
-     ,
-    
-      Q.EXISTS_TAC `[[h]::(x++l2'); (h::HD (x++l2'))::TL (x++l2')]`>>
-      STRIP_TAC
-      Q.EXISTS_TAC `(x++l2')`>>
-      ASM_SIMP_TAC list_ss []
-     
-
- 
-      ASM_SIMP_TAC list_ss [ GSYM PARTS_MEM_HEAD_THM]
-      REV_FULL_SIMP_TAC list_ss [MEM]
-      REWRITE_TAC [MEM]
-      ASM_SIMP_TAC list_ss []
-      DISJ2_TAC 
-      
-
-      ASM_SIMP_TAC list_ss []
-      TL
-
-      EVAL ``TL ([[]])``
-      DB.find
-
-      STRIP_TAC
-
-    FULL_SIMP_TAC bool_ss [] >>
-    Q.EXISTS_TAC `l'`>>
-    STRIP_TAC>-
-      (Q.EXISTS_TAC `x'`>> ASM_SIMP_TAC std_ss [])>>
-    Q.PAT_X_ASSUM `MEM ([h']::e) _` (fn x => MP_TAC x)>>
-)
 
 val PARTS_MEM_APPEND_THM2 = store_thm(
   "PARTS_MEM_APPEND_THM2",
@@ -354,7 +224,7 @@ val PARTS_MEM_APPEND_THM2 = store_thm(
             (MEM l2' (parts l2))  ==>
             (MEM (l1' ++ l2') (parts (l1 ++ l2)))``,
 
-)
+SIMP_TAC list_ss [PARTS_SPEC]);
 
 
 val PARTS_FLAT_MEM_THM = store_thm(
@@ -362,68 +232,11 @@ val PARTS_FLAT_MEM_THM = store_thm(
   
   ``!partition l. ((FLAT partition) = l) ==> 
                   ((MEM (FILTER ($<>[] ) partition)) ( parts l))``,
-  Induct_on `l`>-
-  (
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    GEN_TAC>>
-    SIMP_TAC list_ss [FILTER_EQ_NIL, FLAT_EQ_NIL]>>
-    cheat )
-  
-  REPEAT GEN_TAC
-  SIMP_TAC list_ss [PARTS_MEM_HEAD_THM]
-  cheat
-);
-  (*
-  Induct>|
-  [
-    REPEAT STRIP_TAC>>
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    Cases_on `partition'` >>  
-    Induct_on `partition'`>> 
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
-  ,
-      
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
-    REPEAT GEN_TAC 
-    IF_CASES_TAC
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]
-    STRIP_TAC
-    `?r r'. (partition' = (h::r)::r') /\ ((FLAT (r::r')) = l)` by  ALL_TAC
-    Cases_on `partition'`
-    FULL_SIMP_TAC list_ss []>>
-    Cases_on `h'`>>
-    FULL_SIMP_TAC list_ss []>>
-     Q.EXISTS_TAC `[]`
-     Q.EXISTS_TAC `[l]`
-       FULL_SIMP_TAC list_ss []>>
-    
-*)
 
+SIMP_TAC list_ss [PARTS_SPEC, MEM_FILTER] >>
+Induct >- SIMP_TAC list_ss [] >>
+ASM_SIMP_TAC (list_ss++boolSimps.LIFT_COND_ss) []);
 
-
-
-
-
-
-(*****************)
-  Induct>-
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-    
-  REPEAT GEN_TAC>>
-    ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-  Cases_on `h`>>ASM_SIMP_TAC list_ss [PARTS_def, FLAT, MEM, FILTER]>>
-  STRIP_TAC>>
-  
-  `?r.((FLAT partition')=r) /\( l = h'::(t++r))` by ASM_SIMP_TAC list_ss []>>
-  Q.PAT_X_ASSUM `!l. _` (fn x=> MP_TAC (Q.SPEC `r` x))>>
-  ASM_REWRITE_TAC []>>
-  Q.PAT_X_ASSUM `FLAT _ = _` (fn x=> REWRITE_TAC [GSYM x])>>
-  REWRITE_TAC[PARTS_def]>>
-  IF_CASES_TAC>>
-    ASM_SIMP_TAC list_ss [MAP, PARTS_def, FLAT, MEM, FILTER]>>
-  (* TODO: finish proof *)
-  cheat
-); 
 
 val ACCEPT_def = Define 
   `(accept Eps       u = (u=[]))/\
