@@ -81,28 +81,14 @@ val SPLIT_def = Define
   `(split []    = [([],[])]) /\
    (split (c::cs) = ([],c::cs)::(MAP (\x. (c::(FST x), SND x)) (split cs)))`;
 
-
 val SPLIT_APPEND_THM = store_thm(
   "SPLIT_APPEND_THM",
-  ``!A B. ? C D. (split (A++B)) = ( C++[(A,B)] ++ D)``
-,
- Induct >-
- (
-   GEN_TAC >>
-   Q.EXISTS_TAC `[]`>>
-   Cases_on `B` >> (
-      SIMP_TAC list_ss [ SPLIT_def]
-   )
- )>>
- REPEAT GEN_TAC>>
- SIMP_TAC list_ss [ SPLIT_def] >>
- `? C D .split (A ++ B) = C ++ [(A,B)] ++ D` by (
-    METIS_TAC []
- )>>
- Q.EXISTS_TAC `([],h::(A ++ B))::(MAP (λx. (h::FST x,SND x)) C)`>>
- Q.EXISTS_TAC `(MAP (\x. (h::FST x,SND x)) D)`>>
- ASM_SIMP_TAC list_ss []
-);
+  ``!A B. MEM (A,B) (split (A++B))``,
+
+Induct >| [
+  Cases >> SIMP_TAC list_ss [SPLIT_def],
+  ASM_SIMP_TAC (list_ss++QI_ss) [SPLIT_def, MEM_MAP]
+]);
 
 EVAL ``split []``;
 EVAL ``split [x]``;
@@ -297,40 +283,27 @@ EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;2]``;
 val LANGUAGE_ACCEPTED_THM = store_thm(
   "LANGUAGE_ACCEPTED_THM",
   ``!R x. x IN language_of R ==> accept R x``,
-
   Induct_on `R` >>
     (* Solve simple cases *)
     REPEAT STRIP_TAC >>
-    FULL_SIMP_TAC list_ss [LANGUAGE_OF_def, ACCEPT_def] >|
+    FULL_SIMP_TAC (list_ss++pred_setSimps.PRED_SET_ss) [LANGUAGE_OF_def, 
+                                                        ACCEPT_def]>|
   [
-    FULL_SIMP_TAC std_ss [SET_SPEC_CONV ``x IN
-      {fstPrt ++ sndPrt |
-       fstPrt IN language_of R /\ sndPrt IN language_of R'}``]>>
-    MP_TAC (Q.SPECL [`fstPrt`,`sndPrt`] SPLIT_APPEND_THM)>>
-    STRIP_TAC>>
-    ASM_SIMP_TAC std_ss [EXISTS_DEF, EXISTS_APPEND]
-  ,
-    FULL_SIMP_TAC bool_ss [IN_GSPEC_IFF]>>
-    Cases_on `x` >> ASM_REWRITE_TAC [ACCEPT_def] >-
-    (
+    REWRITE_TAC [EXISTS_MEM]>>
+    Q.EXISTS_TAC `(fstPrt,sndPrt)`>>
+    ASM_SIMP_TAC list_ss [SPLIT_APPEND_THM],
+
+    Cases_on `x` >> ASM_REWRITE_TAC [ACCEPT_def]>-(
       Cases_on `words=[]::t`>>
       Cases_on `words`>>
       FULL_SIMP_TAC list_ss [FLAT,EVERY_DEF]
     )>>
     REWRITE_TAC [ EXISTS_MEM]>>
     Q.EXISTS_TAC `FILTER ($<>[]) words`>>
-    STRIP_TAC >|
-    [
-      ASM_SIMP_TAC list_ss [PARTS_FLAT_MEM_THM]
-    ,
-      SIMP_TAC std_ss []
-      LANGUAGE_OF_def
-      Q.SPECL [`\e.true`, `\(x:'a list).x=x`, `(words:'a list list)`] EVERY_FILTER_IMP
-      REWRITE_TAC [EVERY_FILTER_IMP]
-      Q.PAT_X_ASSUM `EVERY (_) words` (fn x => MP_TAC x)>>
-      SIMP_TAC std_ss [EVERY_MEM]>>
-      REPEAT STRIP_TAC>>
-      ASM_SIMP_TAC std_ss[]
+    STRIP_TAC >|[
+      ASM_SIMP_TAC list_ss [PARTS_FLAT_MEM_THM],
+
+      FULL_SIMP_TAC list_ss [MEM_FILTER,EVERY_MEM]
     ]
   ]
 );
