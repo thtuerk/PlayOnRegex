@@ -2,7 +2,7 @@ open HolKernel Parse boolLib bossLib
 open pred_setSyntax pred_setLib listTheory rich_listTheory listTheory pred_setTheory
 open EmitML basis_emitTheory
 
-val _ = new_theory "poregex"
+val _ = new_theory "regexp"
 
 (* =========================== *)
 (*    DEFINITION OF REGEX    *)
