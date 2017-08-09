@@ -79,7 +79,7 @@ val SPLIT_def = Define
   `(split []    = [([],[])]) /\
    (split (c::cs) = ([],c::cs)::(MAP (\x. (c::(FST x), SND x)) (split cs)))`;
 
-val SPLIT_APPEND_THM = store_thm(
+val MEM_SPLIT_APPEND_THM = store_thm(
   "SPLIT_APPEND_THM",
   ``!A B. MEM (A,B) (split (A++B))``,
 
@@ -87,6 +87,27 @@ Induct >| [
   Cases >> SIMP_TAC list_ss [SPLIT_def],
   ASM_SIMP_TAC (list_ss++QI_ss) [SPLIT_def, MEM_MAP]
 ]);
+
+
+
+val SPLIT_APPEND_THM =  store_thm(
+  "SPLIT_APPEND_THM",
+  ``!l l1 l2. (MEM (l1, l2) (split l)) <=> (l1 ++ l2 = l)``,
+  SIMP_TAC std_ss [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
+  (Tactical.REVERSE CONJ_TAC) >-(
+    Induct >- (
+      Cases >> SIMP_TAC list_ss [SPLIT_def]
+    )>>
+    ASM_SIMP_TAC (list_ss++QI_ss) [SPLIT_def, MEM_MAP]
+  )>>
+  Induct>-(
+     ASM_SIMP_TAC (list_ss) [SPLIT_def]
+  )>>
+
+  ASM_SIMP_TAC (list_ss) [SPLIT_def, MEM_MAP]>>
+  REPEAT STRIP_TAC>>
+  FULL_SIMP_TAC list_ss []
+);
 
 EVAL ``split []``;
 EVAL ``split [x]``;
@@ -104,9 +125,8 @@ val PARTS_def = Define
    `;
 
 
-val PARTS_SPEC = store_thm ("parts_SPEC",
+val PARTS_SPEC = store_thm ("PARTS_SPEC",
   ``!(l:'a list) ll. MEM ll (parts l) <=> (~(MEM [] ll) /\ (FLAT ll = l))``,
-
 Induct >- (
   SIMP_TAC list_ss [PARTS_def, FLAT_EQ_NIL, EVERY_MEM] >>
   Cases_on `ll` >| [
@@ -167,7 +187,7 @@ val PARTS_NON_EMPTY_THM = store_thm(
 
 
 val PARTS_SINGEL_THM = store_thm(
-  "PARTS_SINGEl_THM",
+  "PARTS_SINGEL_THM",
   ``!e x. (e =[[x]]) = (MEM (e) (parts [x]))``,
 
     ASM_SIMP_TAC list_ss [PARTS_def]
@@ -219,19 +239,19 @@ EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;2]``;
 (*  Equaivalance of semantics and executable model         *)
 (* ============================================================= *)
 
-val FLAT_EQ_FLAT_WITHOUT_EMPTY_thm = prove( 
+val FLAT_EQ_FLAT_WITHOUT_EMPTY_thm = prove(
 ``!words. (FLAT words) =(FLAT (FILTER (\y. []<>y) words))``,
-Induct_on `words`>> 
+Induct_on `words`>>
 (
   ASM_SIMP_TAC (list_ss++boolSimps.LIFT_COND_ss) []
 ));
 
 (*
 
-unesesary lemman in this current version of the proof 
+unesesary lemman in this current version of the proof
 But it could be usefull for something else
 
-val FLAT_SINGLETON_thm = prove( 
+val FLAT_SINGLETON_thm = prove(
 ``!l x. (FLAT l = [x]) ==> MEM [x] l ``,
   Induct>>
   ASM_SIMP_TAC list_ss [FLAT]>>
@@ -255,19 +275,19 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
   Induct_on `R` >>
     (* Solve simple cases *)
     REPEAT STRIP_TAC >>
-    FULL_SIMP_TAC (list_ss++pred_setSimps.PRED_SET_ss) [
-      EXISTS_MEM,
-      LANGUAGE_OF_def, 
-      ACCEPT_def]>|
+    FULL_SIMP_TAC (list_ss++pred_setSimps.PRED_SET_ss) [ EXISTS_MEM,
+                                                         LANGUAGE_OF_def,
+                                                         ACCEPT_def
+                                                       ]>|
   [
     Q.EXISTS_TAC `(fstPrt,sndPrt)`>>
     ASM_SIMP_TAC list_ss [SPLIT_APPEND_THM]
   ,
     Q.EXISTS_TAC `FILTER ($<>[]) words`>>
-    FULL_SIMP_TAC list_ss [MEM_FILTER, 
-                           EVERY_MEM, 
-                           PARTS_SPEC, 
-                           GSYM FLAT_EQ_FLAT_WITHOUT_EMPTY_thm ]
+    FULL_SIMP_TAC list_ss [ MEM_FILTER,
+                            EVERY_MEM,
+                            PARTS_SPEC,
+                            GSYM FLAT_EQ_FLAT_WITHOUT_EMPTY_thm ]
   ]
 );
 
