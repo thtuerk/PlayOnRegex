@@ -1,5 +1,5 @@
 open HolKernel Parse boolLib bossLib
-open pred_setSyntax pred_setLib listTheory rich_listTheory listTheory pred_setTheory
+open pred_setSyntax pred_setLib listTheory rich_listTheory listTheory pred_setTheory arithmeticTheory
 open EmitML basis_emitTheory
 
 val _ = new_theory "regexp"
@@ -290,6 +290,126 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
                             GSYM FLAT_EQ_FLAT_WITHOUT_EMPTY_thm ]
   ]
 );
+
+ (* ======================================= *)
+(*            Marked Regex               *)
+ (* ======================================= *)
+
+val MReg = Datatype `MReg = MEps
+                          | MSym bool 'a
+                          | MAlt MReg MReg
+                          | MSeq MReg MReg
+                          | MRep MReg`;
+val EMPTY_M_DEF = Define 
+  `
+   (empty MEps = T) /\
+   (empty (MSym _ _) = F) /\
+   (empty (MAlt p q) = empty p \/ empty q) /\
+   (empty (MSeq p q) = empty p /\ empty q) /\
+   (empty (MRep _  ) = T )
+  `;
+
+
+EVAL ``empty MEps``;
+EVAL ``empty (MAlt MEps (MSym T 2))``;
+EVAL ``empty (MSeq MEps (MSym T 2))``;
+EVAL ``empty (MAlt (MSym T 2) MEps)``;
+EVAL ``empty (MAlt (MRep(MSym T 2)) MEps)``;
+EVAL ``empty (MAlt (MRep(MSym T 2)) (MRep(MSym T 2)))``;
+
+val FINAL_M_DEF = Define 
+  `(final MEps = F) /\
+   (final (MSym b _) = b) /\
+   (final (MAlt p q) = final p\/final q) /\
+   (final (MSeq p q) = final p/\empty q \/ final q ) /\
+   (final (MRep  r ) = final r )`;
+
+EVAL ``final MEps``;
+EVAL ``final (MAlt MEps (MSym T 2))``;
+EVAL ``final (MSeq MEps (MSym T 2))``;
+EVAL ``final (MSeq (MSym T 2) MEps)``;
+EVAL ``final (MSeq (MSym T 2) MEps)``;
+EVAL ``final (MSeq (MSym T 2) (MSym F 2))``;
+EVAL ``final (MAlt (MRep(MSym T 2)) MEps)``;
+EVAL ``final (MSeq (MRep(MSym T 2)) (MRep(MSym F 2)))``;
+
+
+
+val SHIFT_M_DEF = Define
+  `(shift _ MEps _ =  MEps )/\
+   (shift m (MSym _ x) c = MSym (m /\ (x=c) ) x )/\
+   (shift m (MAlt p q) c = MAlt (shift m p c) (shift m q c))/\
+   (shift m (MSeq p q) c =
+     MSeq (shift m p c)
+	  (shift (m /\ empty p \/ final p) q c))/\
+   (shift m (MRep r)    c =
+     MRep (shift (m \/ final r) r c) )`;
+
+val ex_regex_def = Define 
+`exmpl_reg = 
+   MSeq 
+     (MRep (MSeq 
+         (MSeq
+           (MRep (MAlt 
+             (MSym F 1) 
+             (MSym F 2)
+           ))
+           (MSym F 3)
+         ) 
+         (MSeq
+           (MRep (MAlt 
+             (MSym F 1) 
+             (MSym F 2)
+           ))
+           (MSym F 3)
+         ) 
+     )) 
+     ((MRep (MAlt 
+        (MSym F 1) 
+        (MSym F 2)
+      )))`;
+
+EVAL ``shift T exmpl_reg 3``
+EVAL ``shift T exmpl_reg 1``
+EVAL ``shift T exmpl_reg 1``
+
+
+val ACCEPT_M_DEF = Define 
+  `( acceptM r []      = empty r ) /\
+   ( acceptM r (c::cs) = final (FOLDL (shift F) (shift T r c) cs))`
+
+EVAL ``acceptM exmpl_reg [1;2]``
+
+val Sanity1 = prove(
+`` !n v . acceptM (MRep (MSym F v)) (REPLICATE n v) ``,
+REPEAT STRIP_TAC>>
+Cases_on `n`>>
+    FULL_SIMP_TAC list_ss [REPLICATE, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF]>>
+Induct_on `n'`>>
+    FULL_SIMP_TAC list_ss [REPLICATE, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF]
+);
+
+val Sanity2 = prove(
+`` !l. (EVERY ( \x. (x=1) \/ (x=2) \/ (x=3)) l /\ 
+       EVEN  ( LIST_ELEM_COUNT 3 l ) )=
+       (acceptM exmpl_reg l)``,
+REPEAT STRIP_TAC>>
+Cases_on `l`>>
+    FULL_SIMP_TAC list_ss [REPLICATE, EVEN, LIST_ELEM_COUNT_DEF, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF, ex_regex_def]>>
+Induct_on `n'`>>
+    FULL_SIMP_TAC list_ss [REPLICATE, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF]
+    
+
+REWRITE_TAC [ex_regex_def]
+)
+val  MARK_REG_DEF = Define 
+  `(MARK_REG Eps = MEps) /\
+   (MARK_REG (Sym x) = MSym F x)/\
+   (MARK_REG (Alt p q) = MAlt (MARK_REG p) (MARK_REG q) )/\
+   (MARK_REG (Seq p q) = MSeq (MARK_REG p) (MARK_REG q) )/\
+   (MARK_REG (Rep r) = MRep (MARK_REG r) )`;
+
+
 
 
  (* ======================================= *)
