@@ -271,19 +271,38 @@ val FLAT_SINGLETON_thm = prove(
 
 val LANGUAGE_ACCEPTED_THM = store_thm(
   "LANGUAGE_ACCEPTED_THM",
-  ``!R x. x IN language_of R ==> accept R x``,
+  ``!R x. x IN language_of R = accept R x``,
   Induct_on `R` >>
     (* Solve simple cases *)
     REPEAT STRIP_TAC >>
     FULL_SIMP_TAC (list_ss++pred_setSimps.PRED_SET_ss) [ EXISTS_MEM,
                                                          LANGUAGE_OF_def,
-                                                         ACCEPT_def
-                                                       ]>|
-  [
+                                                         ACCEPT_def]>>
+    REWRITE_TAC [boolTheory.EQ_IMP_THM] >>
+    REPEAT STRIP_TAC>|
+  [ 
+    (* Seq lang to accept  *)
     Q.EXISTS_TAC `(fstPrt,sndPrt)`>>
     ASM_SIMP_TAC list_ss [SPLIT_APPEND_THM]
   ,
+    (* Seq accept to lang  *)
+    Q.EXISTS_TAC `FST x'`>>
+    Q.EXISTS_TAC `SND x'`>>
+    `?l1 l2. x'=(l1,l2)` by (
+      Q.EXISTS_TAC `FST x'`>>
+      Q.EXISTS_TAC `SND x'`>>
+      SIMP_TAC list_ss [])>>
+    FULL_SIMP_TAC list_ss [SPLIT_APPEND_THM]
+  ,
+    (* Rep lang to accept *)
     Q.EXISTS_TAC `FILTER ($<>[]) words`>>
+    FULL_SIMP_TAC list_ss [ MEM_FILTER,
+                            EVERY_MEM,
+                            PARTS_SPEC,
+                            GSYM FLAT_EQ_FLAT_WITHOUT_EMPTY_thm ]
+  , 
+    (* Rep accept to lang *)
+    Q.EXISTS_TAC `partition'`>>
     FULL_SIMP_TAC list_ss [ MEM_FILTER,
                             EVERY_MEM,
                             PARTS_SPEC,
@@ -300,6 +319,14 @@ val MReg = Datatype `MReg = MEps
                           | MAlt MReg MReg
                           | MSeq MReg MReg
                           | MRep MReg`;
+
+val  MARK_REG_DEF = Define 
+  `(MARK_REG Eps = MEps) /\
+   (MARK_REG (Sym x) = MSym F x)/\
+   (MARK_REG (Alt p q) = MAlt (MARK_REG p) (MARK_REG q) )/\
+   (MARK_REG (Seq p q) = MSeq (MARK_REG p) (MARK_REG q) )/\
+   (MARK_REG (Rep r) = MRep (MARK_REG r) )`;
+
 val EMPTY_M_DEF = Define 
   `
    (empty MEps = T) /\
@@ -345,6 +372,73 @@ val SHIFT_M_DEF = Define
    (shift m (MRep r)    c =
      MRep (shift (m \/ final r) r c) )`;
 
+
+
+val ACCEPT_M_DEF = Define 
+  `( acceptM r []      = empty r ) /\
+   ( acceptM r (c::cs) = final (FOLDL (shift F) (shift T r c) cs))`;
+
+
+(*
+val FOLDL_SHIFT_MREP = store_thm (
+"FOLDL_SHIFT_MREP",
+``!r h1 t1 h2 t2.
+  ( final(FOLDL (shift F) (shift T r h1) t1) ) /\ ( final(FOLDL (shift F) (shift T r h2) t2) ) =
+  ( final(FOLDL (shift F) (shift T (MRep r) h1) (t1++h2::t2)) )
+``,
+
+Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
+STRIP_TAC>|
+Induct_on `t1`
+REPEAT STRIP_TAC
+
+ASM_SIMP_TAC list_ss [MARK_REG_DEF, ACCEPT_M_DEF, EMPTY_M_DEF, LANGUAGE_OF_def, SHIFT_M_DEF, FINAL_M_DEF]
+
+
+);
+*)
+
+val MARKED_M_DEF = Define
+  `(marked MEps = F ) /\
+   (marked (MSym v x) = v) /\
+   (marked (MAlt p q) = (marked p) \/ (marked q )) /\
+   (marked (MSeq p q) = (marked p) \/ (marked q )) /\
+   (marked (MRep r)   = marked r )`;
+
+val MSYM_STAYS_UNMARKED_THM = store_thm(
+  "MSYM_STAYS_UNMaRKED_THM",
+  ``!l a. FOLDL (shift F) (MSym F a) l = MSym F a``,
+  Induct>>
+    ASM_SIMP_TAC list_ss [SHIFT_M_DEF] 
+);
+
+val MSYM_BECOMES_UNMARKED_THM = store_thm(
+  "MSYM_BECOMES_UNMaRKED_THM",
+  ``!t h b. FOLDL (shift F) (MSym b a) (h::t) = MSym F a``,
+  Induct>>
+    ASM_SIMP_TAC list_ss [SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM] 
+);
+
+val UNMARKED_NOT_FINAL_THM = store_thm(
+  "UNMARKED_NOT_FINAL_THM",
+  ``!R. ~marked R ==> (final R ==> F)``,
+  Induct>>
+    ASM_SIMP_TAC list_ss [MARKED_M_DEF,MSYM_STAYS_UNMARKED_THM, FINAL_M_DEF]
+);
+
+val STAYS_UNMARKED_THM = store_thm(
+  "MSYM_STAYS_UNMaRKED_THM",
+  ``!R l. (~marked R) ==> ((FOLDL (shift F) (R) l) = R)``,
+  Induct>>
+    Induct>>
+      REPEAT STRIP_TAC>>  
+      REPEAT ( 
+        Q.PAT_X_ASSUM `!l. _` (fn x => MP_TAC ( Q.SPEC `[h]` x))
+      )>> 
+      MP_TAC (Q.SPEC `R` UNMARKED_NOT_FINAL_THM)>>
+      FULL_SIMP_TAC list_ss [MARKED_M_DEF, SHIFT_M_DEF, FOLDL, MSYM_STAYS_UNMARKED_THM]
+);
+
 val ex_regex_def = Define 
 `exmpl_reg = 
    MSeq 
@@ -369,18 +463,50 @@ val ex_regex_def = Define
         (MSym F 2)
       )))`;
 
-EVAL ``shift T exmpl_reg 3``
-EVAL ``shift T exmpl_reg 1``
-EVAL ``shift T exmpl_reg 1``
+EVAL ``shift T exmpl_reg 3``;
+EVAL ``shift T exmpl_reg 1``;
+EVAL ``shift T exmpl_reg 1``;
 
 
-val ACCEPT_M_DEF = Define 
-  `( acceptM r []      = empty r ) /\
-   ( acceptM r (c::cs) = final (FOLDL (shift F) (shift T r c) cs))`
 
-EVAL ``acceptM exmpl_reg [1;2]``
 
-val Sanity1 = prove(
+EVAL ``acceptM ((MRep (MAlt 
+        (MSym F 1) 
+        (MSym F 2)
+      ))) []``;
+
+EVAL ``acceptM exmpl_reg [1;3;2;1;2;3;1]``;
+
+EVAL ``acceptM ((MRep (MAlt 
+        (MSym F 1) 
+        (MSym F 2)
+      ))) [1;2;1;1;1;1;1]``;
+
+EVAL ``acceptM ((MRep (MSeq 
+        (MSym F 1) 
+        (MSym F 2)
+      ))) [1;2;1;2]``;
+
+
+val EPS_REPITED_SHIFT = store_thm (
+"EPS_REPITED_SHIFT",
+``!t. FOLDL(shift F) MEps t = MEps``,
+  Induct_on `t`>>
+  ASM_SIMP_TAC list_ss [MARK_REG_DEF, ACCEPT_M_DEF, EMPTY_M_DEF, LANGUAGE_OF_def, SHIFT_M_DEF, FINAL_M_DEF]);
+
+val EPS_ACCEPTS_EMPTY = prove(
+``!e. acceptM MEps e = (e=[]) ``,
+  STRIP_TAC>>
+  Cases_on `e` >>
+  ASM_SIMP_TAC list_ss [MARK_REG_DEF, ACCEPT_M_DEF, EMPTY_M_DEF, LANGUAGE_OF_def, SHIFT_M_DEF, FINAL_M_DEF, EPS_REPITED_SHIFT]
+);
+
+val REP_NULLABLE = prove(
+``!r. acceptM (MRep r) []``,
+  ASM_SIMP_TAC list_ss [MARK_REG_DEF, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF]
+);
+
+val ACCEPT_REP_REPLICATE1 = prove(
 `` !n v . acceptM (MRep (MSym F v)) (REPLICATE n v) ``,
 REPEAT STRIP_TAC>>
 Cases_on `n`>>
@@ -389,28 +515,216 @@ Induct_on `n'`>>
     FULL_SIMP_TAC list_ss [REPLICATE, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF]
 );
 
-val Sanity2 = prove(
-`` !l. (EVERY ( \x. (x=1) \/ (x=2) \/ (x=3)) l /\ 
-       EVEN  ( LIST_ELEM_COUNT 3 l ) )=
-       (acceptM exmpl_reg l)``,
+
+(*val ACCEPT_REP_APPEND_THM = store_thm(
+  "ACCEPT_REP_APPEND_THM",
+  `` !w1 w2 R . (acceptM R w1 /\ acceptM R w2) = (acceptM (MRep R) (w1++w2)) ``,
+  Induct_on `w1++w2` 
+);*)
+
+val ACCEPT_SEQ_APPEND_THM = store_thm(
+  "ACCEPT_SEQ_APPEND_THM",
+  `` !h t R1 R2. (final (FOLDL (shift F) (shift T (MSeq R1 R2) h) (t))) ==>
+                    (?t1 h2 t2. (t = t1++h2::t2) /\ 
+                    (final( FOLDL (shift F) (shift T R1 h) t1)) /\   
+                    (final( FOLDL (shift F) (shift T R2 h2) t2)) \/
+                    (empty(R1) ) /\   
+                    (final( FOLDL (shift F) (shift T R2 h) t)))
+  ``,
+  cheat
+
+(*
+Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
+REPEAT STRIP_TAC
+
+  Induct_on `t` >>
+   REV_FULL_SIMP_TAC list_ss [FINAL_FOLDL_SHIFT_ALT_THM , FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]>>
+   
+   REPEAT STRIP_TAC *)
+);
+
+val ACCEPT_REP_APPEND_THM = store_thm(
+  "ACCEPT_REP_APPEND_THM",
+  `` !h t R.  (final (FOLDL (shift F) (shift T (MRep R) h) (t))) =
+                    ?t1 h2 t2. (t = t1++h2::t2) /\ 
+                   (final( FOLDL (shift F) (shift T R h) t1)) /\   
+                    (final( FOLDL (shift F) (shift T R h2) t2)) ``,
+  cheat
+);
+
+val ACCEPT_REP_APPEND2_THM = store_thm(
+  "ACCEPT_REP_APPEND2_THM",
+  `` !h t R. (final (FOLDL (shift F) (shift T (MRep R) h) (t))) =
+                    ?t1 h2 t2. (t = t1++h2::t2) /\ 
+                    (final( FOLDL (shift F) (shift T R h) t1)) /\   
+                    (final( FOLDL (shift F) (shift T (MRep R) h2) t2)) ``,
+
+  cheat
+);
+
+(* probably need a lema like this aswell *)
+val ACCEPT_REP_FLAT_THM = store_thm(
+  "ACCEPT_REP_FLAT_THM",
+  `` !h t R. (final (FOLDL (shift F) (shift T (MRep R) h) (FLAT t))) =
+             (final (FOLDL (shift F) (shift T R h) (FLAT (HD t)))) /\
+             (EVERY (\x. (final (FOLDL (shift F) (shift T R (HD x)) (TL x))))  TL t)``,
+  cheat
+);
+
+(*
+val ACCEPT_REP_FLAT_THM = prove(
+`` !l R. (EVERY (acceptM R) l) = (acceptM (MRep R) (FLAT l)) ``,
+
+Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
+STRIP_TAC>|
+[
+  Induct>>
+  
+   REPEAT STRIP_TAC>>
+   REV_FULL_SIMP_TAC list_ss [FINAL_FOLDL_SHIFT_ALT_THM , FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]>>
+   `acceptM (MRep R) (FLAT l)` by METIS_TAC []>>
+   Q.PAT_X_ASSUM `!R._` (fn x=> ALL_TAC)>>
+   Induct_on `h`
+,
+
+
+]
+
 REPEAT STRIP_TAC>>
-Cases_on `l`>>
-    FULL_SIMP_TAC list_ss [REPLICATE, EVEN, LIST_ELEM_COUNT_DEF, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF, ex_regex_def]>>
+Cases_on `n`>>
+    FULL_SIMP_TAC list_ss [REPLICATE, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF]>>
 Induct_on `n'`>>
     FULL_SIMP_TAC list_ss [REPLICATE, ACCEPT_M_DEF, EMPTY_M_DEF, FINAL_M_DEF, SHIFT_M_DEF]
+);
+ *)
+
+val EMPTY_STRING_IN_NULLABLE_REG = store_thm (
+  "EMPTY_STRING_IN_NULLABLE_REG",
+  ``!r. [] IN language_of r = empty (MARK_REG r)``,
+  Induct>>
+    ASM_SIMP_TAC (list_ss ++pred_setSimps.PRED_SET_ss) [MARK_REG_DEF, LANGUAGE_OF_def, EMPTY_M_DEF]>>
+  Q.EXISTS_TAC `[]`>>
+  ASM_SIMP_TAC (list_ss) []
+);
+
+val FOLDL_SHIFT_ALT_THM = store_thm (
+"FOLDL_SHIFT_ALT_THM",
+``!l R R'. FOLDL (shift F) (MAlt R R') l = MAlt (FOLDL (shift F) R l) (FOLDL (shift F) R' l)``,
+Induct>>
+   ASM_SIMP_TAC list_ss [ SHIFT_M_DEF, FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]
+);
+
+val FINAL_FOLDL_SHIFT_ALT_THM = store_thm (
+"FINAL_FOLDL_SHIFT_ALT_THM",
+``!l R R'. final (FOLDL (shift F) (MAlt R R') l) = final (FOLDL (shift F) R l) \/ final (FOLDL (shift F) R' l)``,
+   ASM_SIMP_TAC list_ss [FINAL_M_DEF, FOLDL_SHIFT_ALT_THM]
+);
+
+(* val FOLDL_SHIFT_SEQ_THM = store_thm (
+"FOLDL_SHIFT_SEQ_THM",
+``! (FOLDL (shift F) (MSeq R R') l) ==>
+               ? l1 l2. (l=l1++l2) /\	    
+               MSeq (FOLDL (shift F) R l) ( FOLDL2 () (R,R') l)``
+DB.find "FOLDL"
+Induct_on `l1++l2`>>
+   ASM_SIMP_TAC list_ss [ SHIFT_M_DEF, FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]>-
+   
+SIMP_TAC list_ss [SHIFT_M_DEF]
+REWRITE_TAC [FOLDL, SHIFT_M_DEF]
+);
+
+val FINAL_FOLDL_SHIFT_SEQ_THM = store_thm (
+"FINAR_FOLDL_SHIFT_SEQ_THM",
+``!h t h1 t1 h2 t2 R R'. final ( FOLDL (shift F) (shift T (MSeq R R')h) (t)) ==>
+               ? l1 l2. h::t = h1::t1++h2::t2 /\	    
+               final ( FOLDL (shift F) R l) /\ (empty R') \/
+               final ( FOLDL (shift F) R' l2) ``
+Induct_on `l1++l2`>>
+   ASM_SIMP_TAC list_ss [ SHIFT_M_DEF, FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]>-
+   
+SIMP_TAC list_ss [SHIFT_M_DEF]
+REWRITE_TAC [FOLDL, SHIFT_M_DEF]
+);
+
+``!l R R'. acceptM  (MSeq R R') l ==>
+               ? l1 l2. (l = l1++l2) /\		    
+               (acceptM R l1) /\
+               (acceptM R' l2) ``
+
+Induct>>
+Cases_on `l`>>
+   ASM_SIMP_TAC list_ss [ SHIFT_M_DEF, FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]>-
+   
+   
+   FULL_SIMP_TAC list_ss [ SHIFT_M_DEF, FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]>-
+Induct_on `t`>>
+REPEAT STRIP_TAC >|
+[
+  Q.EXISTS_TAC `[h]`>>
+  Q.EXISTS_TAC `[]`>>
+  Cases_on `final R`
+,
+]
+EVAL ``T /\ (F \/ T)``
+*)
+val all_defs = [FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF];
+
+val ACCEPT_M_LANGUAGE_THM = strore_thm (
+"ACCEPT_M_LANGUAGE_THM ",
+``!r w. acceptM (MARK_REG r) w <=> w IN (language_of r)``,
+
+`!t h r.
+  final (FOLDL (shift F) (shift T (MARK_REG r) h) t) ⇔
+  h::t IN language_of r ` suffices_by (
+   REPEAT STRIP_TAC >>
+   Cases_on `w`>>
+    ASM_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss)[FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, EMPTY_STRING_IN_NULLABLE_REG])  >>
+
+
+(*Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
+STRIP_TAC>>
+*)
+Induct_on `r`>>
+  REPEAT GEN_TAC>|
+[
+
+  ASM_SIMP_TAC list_ss [FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF]>>
+  SIMP_TAC std_ss [EPS_REPITED_SHIFT,FINAL_M_DEF]
+,
+  ASM_SIMP_TAC list_ss all_defs >>
+  Cases_on `a=h`>>
+  ASM_SIMP_TAC list_ss all_defs >>
+  Cases_on `t`>>
+  ASM_SIMP_TAC list_ss [MSYM_STAYS_UNMARKED_THM,FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF]>>
+   
+  , 
+   FULL_SIMP_TAC list_ss [FINAL_FOLDL_SHIFT_ALT_THM , FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]
+  ,
+   cheat
+   (* I do not understand why this rewrite is failing now *)
+   
+   (*FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [ACCEPT_SEQ_APPEND_THM,MARK_REG_DEF, LANGUAGE_OF_def]
+
+   Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
+   REPEAT STRIP_TAC >|
+   [
+     Q.EXISTS_TAC `h::t1`>>
+     Q.EXISTS_TAC `h2::t2`>>
+     ASM_SIMP_TAC list_ss []
+   ,
+     cheat
+   (*  Q.EXISTS_TAC `TL fstPrt`>>
+     Q.EXISTS_TAC `HD sndPrt`>>
+     Q.EXISTS_TAC `TL sndPrt`>>
+   FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [ACCEPT_SEQ_APPEND_THM , FINAL_M_DEF, MARK_REG_DEF, EPS_ACCEPTS_EMPTY, LANGUAGE_OF_def, ACCEPT_M_DEF, EMPTY_M_DEF, SHIFT_M_DEF, MSYM_STAYS_UNMARKED_THM]
+     *)*)
     
-
-REWRITE_TAC [ex_regex_def]
-)
-val  MARK_REG_DEF = Define 
-  `(MARK_REG Eps = MEps) /\
-   (MARK_REG (Sym x) = MSym F x)/\
-   (MARK_REG (Alt p q) = MAlt (MARK_REG p) (MARK_REG q) )/\
-   (MARK_REG (Seq p q) = MSeq (MARK_REG p) (MARK_REG q) )/\
-   (MARK_REG (Rep r) = MRep (MARK_REG r) )`;
+   ,
 
 
-
+   FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [ACCEPT_REP_FLAT_THM,MARK_REG_DEF, LANGUAGE_OF_def]
+cheat
+ACCEPT_REP_FLAT_THM
 
  (* ======================================= *)
 (*            Code generation            *)
