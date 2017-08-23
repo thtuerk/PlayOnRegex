@@ -15,7 +15,7 @@ val Regex = Datatype `Reg = Eps
                           | Rep Reg`;
 
 (* =========================== *)
-(*    REGEX Semantix         *)
+(*    REGEX Semantics          *)
 (* =========================== *)
 
 val LANGUAGE_OF_def = Define
@@ -50,10 +50,12 @@ val SanitySeq1 = prove(
   SIMP_TAC list_ss []
 );
 
+(* TT: Not needed below 
 val AND_FOLD_FALSE_thm = prove(
   ``!a. ~(FOLDL $/\ F a)``,
   Induct >> ASM_SIMP_TAC std_ss [FOLDL]
 );
+*)
 
 val SanityRepNullable = prove(
   ``([] IN language_of (Rep (Alt (Sym 1) (Sym 2))))``,
@@ -116,6 +118,9 @@ EVAL ``split [x;y;z]``;
 
 (* It was pritty hard to work with this definition,
    maybe i should redefine this  *)
+(* TT: HD, TL etc. are in my opinion usually best to avoid.
+       This however really depends on the situation and needs
+       judgement. Here I would just use the pattern compilation. *)
 val PARTS_def = Define
   `(parts []     = [[]]) /\
    (parts (c::cs) =
@@ -164,6 +169,7 @@ EVAL ``parts [1;2]``;
 EVAL ``parts [1]``;
 EVAL ``parts []``;
 EVAL ``parts [x;y;z;w]``;
+
 
 val PARTS_EMPTY_THM = store_thm(
   "PARTS_EMPTY_THM",
@@ -272,26 +278,33 @@ val FLAT_SINGLETON_thm = prove(
 val LANGUAGE_ACCEPTED_THM = store_thm(
   "LANGUAGE_ACCEPTED_THM",
   ``!R x. x IN language_of R = accept R x``,
-  Induct_on `R` >>
+  (* TT: Better make structure very clear *)
+  Induct_on `R` >> (
     (* Solve simple cases *)
     REPEAT STRIP_TAC >>
     FULL_SIMP_TAC (list_ss++pred_setSimps.PRED_SET_ss) [ EXISTS_MEM,
                                                          LANGUAGE_OF_def,
                                                          ACCEPT_def]>>
     REWRITE_TAC [boolTheory.EQ_IMP_THM] >>
-    REPEAT STRIP_TAC>|
+    REPEAT STRIP_TAC
+  ) >|
   [ 
     (* Seq lang to accept  *)
     Q.EXISTS_TAC `(fstPrt,sndPrt)`>>
     ASM_SIMP_TAC list_ss [SPLIT_APPEND_THM]
   ,
     (* Seq accept to lang  *)
+
+    (* TT: The following looks rather complicated. Perhaps use just a case split and renaming 
     Q.EXISTS_TAC `FST x'`>>
     Q.EXISTS_TAC `SND x'`>>
-    `?l1 l2. x'=(l1,l2)` by (
+    `?l1 l2. x'=(l1,l2)`
       Q.EXISTS_TAC `FST x'`>>
       Q.EXISTS_TAC `SND x'`>>
       SIMP_TAC list_ss [])>>
+    *)
+    Cases_on `x'` >> rename1 `FST (l1, l2)` >>
+    Q.EXISTS_TAC `l1` >> Q.EXISTS_TAC `l2` >>
     FULL_SIMP_TAC list_ss [SPLIT_APPEND_THM]
   ,
     (* Rep lang to accept *)
@@ -309,6 +322,7 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
                             GSYM FLAT_EQ_FLAT_WITHOUT_EMPTY_thm ]
   ]
 );
+
 
  (* ======================================= *)
 (*            Marked Regex               *)
