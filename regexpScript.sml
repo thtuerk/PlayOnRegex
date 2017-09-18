@@ -639,12 +639,12 @@ FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [SHIFT_M_DEF, RLANGUAGE_OF_
 ,
     METIS_TAC []
 ,
-    REPEAT STRIP_TAC>>
-
-    Cases_on `fstPrt`>> FULL_SIMP_TAC list_ss []>|
+    REPEAT STRIP_TAC>|
     [
-       `[h] ∈ r_language_of_m R ∨ B ∧ [h] ∈ language_of (UNMARK_REG R)` by METIS_TAC []>|
-       [
+      Cases_on `fstPrt`>> FULL_SIMP_TAC list_ss []>|
+      [
+         `[h] ∈ r_language_of_m R ∨ B ∧ [h] ∈ language_of (UNMARK_REG R)` by METIS_TAC []>|
+         [
            DISJ1_TAC>> 
            DISJ1_TAC>> 
            Q.EXISTS_TAC `[h]`>>
@@ -656,12 +656,78 @@ FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [SHIFT_M_DEF, RLANGUAGE_OF_
            Q.EXISTS_TAC `[h]`>>
            Q.EXISTS_TAC `sndPrt`>>
            FULL_SIMP_TAC list_ss []
-       ],
-     cheat
-    ]
-       
+         ],
+  
+	 `h::(h'::t') ∈ r_language_of_m R ∨ 
+          B ∧ h::(h'::t') ∈ language_of (UNMARK_REG R)` by METIS_TAC [] >|
+          [
+            DISJ1_TAC >>
+            DISJ1_TAC >>
+	    Q.EXISTS_TAC `h::h'::t'`>>
+	    Q.EXISTS_TAC `sndPrt` >>
+            FULL_SIMP_TAC list_ss [],
+            
+            DISJ2_TAC >>
+            FULL_SIMP_TAC list_ss []>>
+	    Q.EXISTS_TAC `h::h'::t'`>>
+	    Q.EXISTS_TAC `sndPrt` >>
+            FULL_SIMP_TAC list_ss []
+          ]
+       ]
+    ,
+      Q.PAT_X_ASSUM `! B h t. _` (fn x => MP_TAC (
+               Q.SPECL [ `(B ∧ empty R ∨ final R)`, `h`, `t`] x
+      ))>> 
+      ASM_REWRITE_TAC []>>
+      STRIP_TAC>-
+      (
+	  METIS_TAC []
+      )>|
+      [
+         DISJ2_TAC>>
+         `[] IN language_of (UNMARK_REG R)` by METIS_TAC [LANG_OF_EMPTY_REG_THM]>>
+         ASM_SIMP_TAC std_ss[]>>
+         Q.EXISTS_TAC `[]`>>
+         Q.EXISTS_TAC `h::t`>>
+         ASM_SIMP_TAC list_ss []
+      ,
+         DISJ1_TAC>>
+         DISJ1_TAC>>
+         `[] IN r_language_of_m R` by METIS_TAC [LANG_OF_FINAL_REG_THM]>> 
+         Q.EXISTS_TAC `[]`>>
+         Q.EXISTS_TAC `h::t`>>
+         ASM_SIMP_TAC list_ss []
+     ]  
+   ]
 ,
-       
+     REPEAT STRIP_TAC>>
+      Q.PAT_X_ASSUM `! B h t. _` (fn x => MP_TAC (
+               Q.SPECL [ `(B ∨ final R)`, `h`, `fstPrt`] x
+      ))>> 
+     ASM_REWRITE_TAC []>>
+     STRIP_TAC>|
+     [
+       DISJ1_TAC>>
+       Q.EXISTS_TAC `h::fstPrt`>>
+       Q.EXISTS_TAC `sndPrt`>>
+       ASM_SIMP_TAC list_ss []>>
+       METIS_TAC []
+     ,
+       DISJ2_TAC>>
+       ASM_SIMP_TAC list_ss []>>
+       Q.EXISTS_TAC `(h::fstPrt)::words`>>
+       ASM_SIMP_TAC list_ss []
+     ,
+       FULL_SIMP_TAC list_ss[]>>
+       DISJ1_TAC>>
+       Q.EXISTS_TAC `[]`>>
+       Q.EXISTS_TAC `h::(fstPrt++sndPrt)`>>
+       `[] ∈ r_language_of_m R` by METIS_TAC [ LANG_OF_FINAL_REG_THM]>>
+      FULL_SIMP_TAC list_ss []>>
+       Q.EXISTS_TAC `(h::fstPrt)::words`>>
+       ASM_SIMP_TAC list_ss []
+     ]
+ ] 
 );
 
 val LANG_OF_SHIFT_MREG_THM2 = store_thm(
