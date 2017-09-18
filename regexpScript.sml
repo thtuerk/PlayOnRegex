@@ -124,7 +124,6 @@ val PARTS_def = Define
      else FLAT (MAP (\x. [[c]::x; (c::(HD x))::(TL x)]) (parts cs)))
    `;
 
-
 val PARTS_SPEC = store_thm ("PARTS_SPEC",
   ``!(l:'a list) ll. MEM ll (parts l) <=> (~(MEM [] ll) /\ (FLAT ll = l))``,
 Induct >- (
@@ -394,8 +393,9 @@ val MARK_UNMARK_LANG_THM = store_thm(
             (t IN r_language_of_m (shift T (R) h))
 ``,
 
-  Induct >> ASM_SIMP_TAC std_ss [MARK_REG_DEF, UNMARK_REG_DEF]
-REWRITE_TAC [MARK_REG_SHIFT_LANG_THM1]
+(*  Induct >> ASM_SIMP_TAC std_ss [MARK_REG_DEF, UNMARK_REG_DEF]
+REWRITE_TAC [MARK_REG_SHIFT_LANG_THM1] *)
+cheat
 );
 
 val UNMARK_SHIFT_THM = store_thm(
@@ -493,6 +493,9 @@ val EVERY_FLAT_FIRST_NON_EPMTY_HEAD_THM = store_thm(
     FULL_SIMP_TAC list_ss []
 );
 
+
+
+
 val MARK_REG_SHIFT_LANG_THM1 = store_thm(
 "MARK_REG_SHIFT_LANG_THM1",
 ``!h t R. h::t IN language_of (R) = (t IN (r_language_of_m (shift T (MARK_REG R) h)))``,
@@ -584,28 +587,27 @@ STRIP_TAC>|
 );
 
 
-
-val MARK_REG_SIFTED_LANG_THM2 = store_thm(
-  "MARK_REG_SIFTED_LANG_THM2",
-``!R B h t. (h::t IN (r_language_of_m R)) ==> (t IN (r_language_of_m (shift B R h)))``,
-cheat);
-
-
-val MARK_REG_SIFTED_LANG_THM3 = store_thm(
-  "MARK_REG_SIFTED_LANG_THM2",
+val LANG_OF_SHIFT_MREG_THM1 = store_thm(
+  "LANG_OF_SHIFT_MREG_THM1",
 ``!R B h t. (t IN (r_language_of_m (shift B R h))) ==> 
         (h::t IN (r_language_of_m R)) \/ 
         (B /\ h::t IN language_of (UNMARK_REG R))``,
 cheat);
 
-ACCEPT_M_DEF
 
-val MARK_REG_SIFTED_LANG_THM2 = store_thm(
-  "MARK_REG_SIFTED_LANG_THM2",
-`!R B h t. (h::t IN (r_language_of_m R)) ==> (t IN (r_language_of_m (shift B R h)))`
+val LANG_OF_SHIFT_MREG_THM2 = store_thm(
+  "LANG_OF_SHIFT_MREG_THM2",
+``!R B h t. (h::t IN (r_language_of_m R)) ==> (t IN (r_language_of_m (shift B R h)))``,
+cheat
+);
+
+val LANG_OF_SHIFT_MREG_THM2 = store_thm(
+  "LANG_OF_SHIFT_MREG_THM2",
+``!R B h t. (h::t IN (r_language_of_m R)) ==> (t IN (r_language_of_m (shift B R h)))``,
 Induct>|
 [
     SIMP_TAC list_ss [RLANGUAGE_OF_M_DEF]
+
 ,
     Cases_on `b`>>
     SIMP_TAC list_ss [RLANGUAGE_OF_M_DEF] 
@@ -616,47 +618,69 @@ Induct>|
     FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [SHIFT_M_DEF, RLANGUAGE_OF_M_DEF, MARK_REG_DEF, LANGUAGE_OF_def, UNMARK_REG_DEF, UNMARK_SHIFT_THM, UNMARK_MARK_THM, LANGUAGE_OF_def]>>
     REPEAT STRIP_TAC>|
     [
-      Cases_on `fstPrt`
-      FULL_SIMP_TAC list_ss [MARK_REG_SIFTED_LANG_THM1] 
-      Cases_on `sndPrt`
-
+      Cases_on `fstPrt`>> FULL_SIMP_TAC list_ss [] >|[
+        `t ∈ r_language_of_m (shift T ( R') h)` by(
+            METIS_TAC [MARK_REG_SHIFT_LANG_THM1, MARK_UNMARK_LANG_THM]
+        )>>
+        FULL_SIMP_TAC list_ss [LANG_OF_FINAL_REG_THM]
+      ,
+        METIS_TAC []
+      ]
     ,
+      METIS_TAC []
     ]
 
-    REWRITE_TAC [RLANGUAGE_OF_M_DEF] 
+,
 
-    ASM_SIMP_TAC list_ss [SHIFT_M_DEF, RLANGUAGE_OF_M_DEF]
-    REWRITE_TAC [UNMARK_SHIFT_THM]
-    REPEAT STRIP_TAC
-    ASM_SIMP_TAC list_ss [SHIFT_M_DEF]
+    FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [SHIFT_M_DEF, RLANGUAGE_OF_M_DEF, MARK_REG_DEF, LANGUAGE_OF_def, UNMARK_REG_DEF, UNMARK_SHIFT_THM, UNMARK_MARK_THM, LANGUAGE_OF_def]>>
+ REPEAT STRIP_TAC
+
+    Cases_on `fstPrt`>>
+    FULL_SIMP_TAC list_ss []>|[
+      MP_TAC (
+        Q.SPECL [ `words`, `h`, `t`, `\e.e IN language_of (UNMARK_REG R)`] 
+                EVERY_FLAT_FIRST_NON_EPMTY_HEAD_THM
+      )>>
+
+      FULL_SIMP_TAC list_ss [LANG_OF_FINAL_REG_THM]
+      REPEAT STRIP_TAC
+      Q.EXISTS_TAC `word`>>
+      Q.EXISTS_TAC `FLAT words'`
+
+
+     `( h::(word ++ FLAT words') =   h::t) ` by METIS_TAC []
+     FULL_SIMP_TAC list_ss [MARK_REG_SHIFT_LANG_THM1, MARK_UNMARK_LANG_THM]
+
+    METIS_TAC[]
+  ,
      
-    Cases_on `final R`>> ASM_SIMP_TAC list_ss[]
-    REPEAT GEN_TAC
-    
-)>|
-[
-    REPEAT STRIP_TAC>>
-    (
-      FULL_SIMP_TAC list_ss [SHIFT_M_DEF, RLANGUAGE_OF_M_DEF]
-    )
-,
-    SIMP_TAC list_ss [SHIFT_M_DEF, r]
-    FULL_SIMP_TAC list_ss [SHIFT_M_DEF, RLANGUAGE_OF_M_DEF]
-    REV_FULL_SIMP_TAC list_ss [SHIFT_M_DEF]
-    FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) []
-    REPEAT STRIP_TAC>|
-    [
-       Cases_on `fstPrt`>>
-          FULL_SIMP_TAC list_ss [SHIFT_M_DEF, RLANGUAGE_OF_M_DEF]
-	  DISJ1_TAC
-	  Q.EXISTS_TAC `[]`
-	  Q.EXISTS_TAC `t`
-    ,
-    ]
-    
-,
+    Q.EXISTS_TAC `t'`>>
+    Q.EXISTS_TAC `sndPrt`
 
+    FULL_SIMP_TAC list_ss []
+    METIS_TAC[]
+  ]
 ]
+
+val  LANG_OF_FOLD_SHIFT_MREG_THM = store_thm (
+  "LANG_OF_FOLD_SHIFT_MREG_THM",
+  ``!l1 l2 R.
+    l1 IN r_language_of_m (FOLDL (shift F) R l2) =
+    (l2 ++ l1) IN r_language_of_m (R)``,
+
+  Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >> (
+    STRIP_TAC>>
+    Induct_on `l2`>>
+    (
+      SIMP_TAC list_ss [FOLDL]
+    )>>
+    REPEAT STRIP_TAC>>
+    `l2 ++ l1 ∈ r_language_of_m (shift F R h) ` by(
+        METIS_TAC [LANG_OF_SHIFT_MREG_THM2]
+    )>>
+    METIS_TAC [LANG_OF_SHIFT_MREG_THM1]
+  )
+);
 
 val ex_regex_def = Define 
 `exmpl_reg = 
@@ -716,9 +740,9 @@ val ACCEPT_M_LANGUAGE_THM = store_thm (
     )
   )>>
   REWRITE_TAC [LANG_OF_FINAL_REG_THM, MARK_REG_SHIFT_LANG_THM1]>>
-  `!t t' R.
-    t IN r_language_of_m (FOLDL (shift F) R t') =
-    (t++t') IN r_language_of_m (R)` by (
+  `!l1 l2 R.
+    l1 IN r_language_of_m (FOLDL (shift F) R l2) =
+    (l2++l1) IN r_language_of_m (R)` by (
        cheat
   )>>
   REV_FULL_SIMP_TAC list_ss []
