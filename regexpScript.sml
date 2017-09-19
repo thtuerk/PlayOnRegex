@@ -184,7 +184,7 @@ val PARTS_NON_EMPTY_THM = store_thm(
      ASM_SIMP_TAC list_ss [PARTS_EMPTY_THM]
 );
 
-
+(* TT: Typo in name *)
 val PARTS_SINGEL_THM = store_thm(
   "PARTS_SINGEL_THM",
   ``!e x. (e =[[x]]) = (MEM (e) (parts [x]))``,
@@ -238,6 +238,8 @@ EVAL ``accept (Seq (Sym 1)(Sym 2)) [1;2]``;
 (*  Equaivalance of semantics and executable model         *)
 (* ============================================================= *)
 
+(* TT: Turn equality, this direction is not useful, since it will always
+       lead to a non-terminating rewrite system *)
 val FLAT_EQ_FLAT_WITHOUT_EMPTY_thm = prove(
 ``!words. (FLAT words) =(FLAT (FILTER (\y. []<>y) words))``,
 Induct_on `words`>>
@@ -254,6 +256,7 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
     FULL_SIMP_TAC (list_ss++pred_setSimps.PRED_SET_ss) [ EXISTS_MEM,
                                                          LANGUAGE_OF_def,
                                                          ACCEPT_def]>>
+    (* TT: EQ_TAC ? *)
     REWRITE_TAC [boolTheory.EQ_IMP_THM] >>
     REPEAT STRIP_TAC>|
   [
@@ -262,6 +265,7 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
     ASM_SIMP_TAC list_ss [SPLIT_APPEND_THM]
   ,
     (* Seq accept to lang  *)
+    (* TT: Too complicated 
     Q.EXISTS_TAC `FST x'`>>
     Q.EXISTS_TAC `SND x'`>>
     `?l1 l2. x'=(l1,l2)` by (
@@ -269,6 +273,11 @@ val LANGUAGE_ACCEPTED_THM = store_thm(
       Q.EXISTS_TAC `SND x'`>>
       SIMP_TAC list_ss [])>>
     FULL_SIMP_TAC list_ss [SPLIT_APPEND_THM]
+    *)
+
+    Cases_on `x'` >>
+    FULL_SIMP_TAC list_ss [SPLIT_APPEND_THM] >>
+    METIS_TAC[]
   ,
     (* Rep lang to accept *)
     Q.EXISTS_TAC `FILTER ($<>[]) words`>>
@@ -352,6 +361,11 @@ val SHIFT_M_DEF = Define
    (shift m (MRep r)    c =
      MRep (shift (m \/ final r) r c) )`;
 
+(* TT: In HOL there a 3 common ways to name the definition theorem of a constant.
+       The most common is "constant_name_def", then there is "constant_name_DEF" and
+       seldomly "constant_name". You deviate from all 3. I find that confusing.
+       If you really want to have the capitalisation changed, at least don't omit
+       underscores, please. *)
 val RLANGUAGE_OF_M_DEF = Define
 `  (r_language_of_m MEps =  {} )/\
    (r_language_of_m (MSym T x) = {[]} )/\
@@ -367,6 +381,9 @@ val RLANGUAGE_OF_M_DEF = Define
      { fstPrt++sndPrt | fstPrt IN (r_language_of_m r) /\
                          sndPrt IN (language_of (UNMARK_REG (MRep r)))})`;
 
+(* TT: What is this? It does not seem to be used anywhere, parameter m is unused
+       and for me the name suggest a language, i.e. a set of words. However, a regular
+       expression is returned. Delete? *)
 val LANG_OF_M_DEF = Define `langM_of m R = UNMARK_REG R`
 
 val ACCEPT_M_DEF = Define
@@ -374,6 +391,7 @@ val ACCEPT_M_DEF = Define
    ( acceptM r (c::cs) = final (FOLDL (shift F) (shift T r c) cs))`;
 
 
+(* TT: MARKED_M not used ? *)
 val MARKED_M_DEF = Define
   `(marked MEps = F ) /\
    (marked (MSym v x) = v) /\
@@ -387,6 +405,14 @@ val UNMARK_MARK_THM = store_thm(
   Induct >> ASM_SIMP_TAC std_ss [MARK_REG_DEF, UNMARK_REG_DEF]
 );
 
+(* TT: Typo in name 
+       This is not the idea here. The idea is that if there are no marks, the language is
+       empty. If you translate into an MARK_REG there are no marks. The UNMARK_REG is completely
+       unnecessary. So, split this in 3 theorem or delete MARKED_M above and get rid of
+       the UNMARK_REG at least. 
+
+       If used for sanity, split in 3. Otherwise, perhaps delete completely since it is unused.
+*)
 val MARK_UNMARK_EPTY_R_LANG_THM = store_thm(
 "MARK_UNMARK_EPTY_R_LANG_THM",
 ``!R. r_language_of_m (MARK_REG (UNMARK_REG R)) = {}``,
@@ -397,7 +423,8 @@ Induct >>  FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [GSPEC_F, RLANGU
 ));
 
 
-
+(* TT: Typo in name  
+   TT: Unnecessary, since UNMARK_SHIFT_THM below is more general. *)
 val LANG_UNMACK_SHIFT_THM = store_thm (
 "LANG_UNMACK_SHIFT_THM",
 ``!R B h. language_of (UNMARK_REG (shift B R h)) = language_of ( UNMARK_REG R)``,
@@ -410,6 +437,7 @@ val UNMARK_SHIFT_THM = store_thm(
    Induct_on `R` >> FULL_SIMP_TAC list_ss [SHIFT_M_DEF, UNMARK_REG_DEF]
 );
 
+(* TT: not needed, I believe *)
 val UNMARK_FOLD_SHIFT_THM = store_thm(
 "UNMARK_FOLD_SHIFT_THM",
 ``!B R l. (UNMARK_REG (FOLDL (shift B) R l)) = (UNMARK_REG R)``,
@@ -428,6 +456,9 @@ val LANG_OF_EMPTY_REG_THM = store_thm (
   ASM_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) []
 );
 
+
+(* TT: Very hackish, try a cleaner proof. 
+       An idea is to have lemmata for r_language_of_m *)
 val LANG_OF_FINAL_REG_THM = store_thm(
 "LANG_OF_FINAL_REG_THM",
 ``!R. (final R) = [] IN r_language_of_m R``,
@@ -450,6 +481,40 @@ val LANG_OF_FINAL_REG_THM = store_thm(
 );
 
 
+(* TT: suggested alternative. Acually the rewrite lemma is useful already before and
+       should come shortly after the definition. *) 
+val IN_R_LANGUAGE_OF_M = store_thm ("IN_R_LANGUAGE_OF_M",
+`` (!w. ~(w IN r_language_of_m MEps)) /\
+   (!w b x. w IN (r_language_of_m (MSym b x)) <=> (w = []) /\ b) /\
+   (!w p q. w IN r_language_of_m (MAlt p q) <=> 
+        (w IN (r_language_of_m p)) \/ w IN (r_language_of_m q)) /\
+   (!w p q. w IN r_language_of_m (MSeq p q) <=>
+       (w IN r_language_of_m q) \/
+       (?w1 w2. (w = w1 ++ w2) /\ (w1 IN (r_language_of_m p)) /\
+                (w2 IN (language_of (UNMARK_REG q))))) /\
+   (!w r. w IN r_language_of_m (MRep r) <=>
+          ?w1 w2. (w = w1 ++ w2) /\
+                  (w1 IN (r_language_of_m r) /\ 
+                   w2 IN (language_of (Rep (UNMARK_REG r)))))``,
+
+SIMP_TAC (std_ss++pred_setSimps.PRED_SET_ss++boolSimps.EQUIV_EXTRACT_ss) [
+  RLANGUAGE_OF_M_DEF, UNMARK_REG_DEF] >>
+(* TT: This case split disappears, if you use a different definition. *)
+REPEAT STRIP_TAC >> Cases_on `b` >> (
+  SIMP_TAC (std_ss++pred_setSimps.PRED_SET_ss) [RLANGUAGE_OF_M_DEF]
+));
+
+(* TT: @Daniil please prove similar theorems for language_of.
+       Then SanityRepNullable is not needed any more *)
+
+val LANG_OF_FINAL_REG_THM = store_thm(
+"LANG_OF_FINAL_REG_THM",
+``!R. (final R) = [] IN r_language_of_m R``,
+    Induct >> (
+      ASM_SIMP_TAC (list_ss++boolSimps.EQUIV_EXTRACT_ss) [IN_R_LANGUAGE_OF_M, FINAL_M_DEF,
+        LANG_OF_EMPTY_REG_THM, SanityRepNullable]
+    )
+);
 
 
 val FINAL_MARK_REG_F = store_thm(
@@ -458,7 +523,17 @@ val FINAL_MARK_REG_F = store_thm(
   Induct >> METIS_TAC [ FINAL_M_DEF, MARK_REG_DEF]
 );
 
+(* TT: Again, this is very technical and does not cover the underlying principles.
+       Please reformulate. Compare this with the comments on MARK_UNMARK_EPTY_R_LANG_THM.
 
+       The idea is:
+
+       1. Expressions without a mark (``~marked R``) have an empty language
+       2. MARK_REG always returns such marked expressions without a mark set
+       3. ``shift F R c`` is the identity operation for marked expressions without a mark
+       4. So, combining this, if below B is F, then 
+          ``r_language_of_m (shift B (MARK_REG R) h)`` is empty, so B must be T
+*)
 val NON_EMPTY_RLANG_OF_UNMARKED_THM = store_thm(
 "NON_EMPTY_RLANG_OF_UNMARKED_THM",
 ``!R B h t. t IN r_language_of_m (shift B (MARK_REG R) h) ==> (B)``,
@@ -481,6 +556,10 @@ Induct>>(
 ]
 );
 
+(* TT: Typo in name 
+       This is rather technical. I wonder (I'm uncertain) whether you really need it.
+*)
+
 val EVERY_FLAT_FIRST_NON_EPMTY_HEAD_THM = store_thm(
 "EVERY_FLAT_FIRST_NON_EPMTY_HEAD_THM",
 ``! words h t P. (EVERY P words) ==>
@@ -500,11 +579,15 @@ val EVERY_FLAT_FIRST_NON_EPMTY_HEAD_THM = store_thm(
 );
 
 
-
-
+(* TT: I would have done it differently, but this is a sensible lemma.
+       Anyhow, the proof is very technical and should be simplified by using
+       sensible lemmata (see above). *)
 val MARK_REG_SHIFT_LANG_THM1 = store_thm(
 "MARK_REG_SHIFT_LANG_THM1",
 ``!h t R. h::t IN language_of (R) = (t IN (r_language_of_m (shift T (MARK_REG R) h)))``,
+
+(* TT: Bad first step, many things are really the same and working with equality during induction
+       makes your live simpler. Moreover, think of using EQ_TAC *)
 Ho_Rewrite.REWRITE_TAC [boolTheory.EQ_IMP_THM, FORALL_AND_THM] >>
 STRIP_TAC>|
 [
@@ -592,6 +675,9 @@ STRIP_TAC>|
 ]
 );
 
+
+
+(* TT: Do you really need this ? *)
 val MARK_UNMARK_LANG_THM = store_thm(
 "UNMARK_MARK_THM",
 ``! R t h B.  (t IN r_language_of_m (shift T (MARK_REG (UNMARK_REG R)) h)) ==>
@@ -621,6 +707,7 @@ REWRITE_TAC [GSYM MARK_REG_SHIFT_LANG_THM1 ]>>
   METIS_TAC []
 ]);
 
+(* TT: Very technical and complicated. Proof can be simplified, I believe. *)
 val LANG_OF_SHIFT_MREG_THM1 = store_thm(
   "LANG_OF_SHIFT_MREG_THM1",
 ``!R B h t. (t IN (r_language_of_m (shift B R h))) ==>
@@ -729,6 +816,7 @@ FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [SHIFT_M_DEF, RLANGUAGE_OF_
  ]
 );
 
+(* TT: Again, the proof can be simplified using appropriate lemmata *)
 val LANG_OF_SHIFT_MREG_THM2 = store_thm(
   "LANG_OF_SHIFT_MREG_THM2",
 ``!R B h t. (h::t IN (r_language_of_m R)) ==> (t IN (r_language_of_m (shift B R h)))``,
@@ -782,6 +870,9 @@ FULL_SIMP_TAC (list_ss ++ pred_setSimps.PRED_SET_ss) [SHIFT_M_DEF, RLANGUAGE_OF_
   ]
 ]);
 
+
+
+(* TT: Simplify proof, introduce decent lemma first. *)
 val  LANG_OF_FOLD_SHIFT_MREG_THM = store_thm (
   "LANG_OF_FOLD_SHIFT_MREG_THM",
   ``!l1 l2 R.
@@ -802,6 +893,7 @@ val  LANG_OF_FOLD_SHIFT_MREG_THM = store_thm (
   )
 );
 
+(* TT: please clean up *)
 val ex_regex_def = Define
 `exmpl_reg =
    MSeq
@@ -845,9 +937,11 @@ EVAL ``acceptM ((MRep (MSeq
 EVAL ``acceptM (MSym T 1) [1]``;
 
 
+
 val ACCEPT_M_LANGUAGE_THM = store_thm (
 "ACCEPT_M_LANGUAGE_THM",
 ``!r w. acceptM (MARK_REG r) w <=> w IN (language_of r)``,
+
   `!t h r.
      final (FOLDL (shift F) (shift T (MARK_REG r) h) t) ⇔
      h::t IN language_of r ` suffices_by (
